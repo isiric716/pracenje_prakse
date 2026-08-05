@@ -2,7 +2,7 @@ import { useState } from "react";
 
 function EntryModal({ onClose, onSave, editingEntry }) {
   const [form, setForm] = useState({
-    date: editingEntry?.date || "",
+    entry_date: editingEntry?.entry_date || "",
     hours: editingEntry?.hours || "",
     description: editingEntry?.description || "",
   });
@@ -15,12 +15,15 @@ function EntryModal({ onClose, onSave, editingEntry }) {
   };
 
   const handleSubmit = () => {
-    if (!form.date || !form.hours || !form.description) {
+    if (!form.entry_date || !form.hours || !form.description) {
       alert("Popuni sva polja");
       return;
     }
 
-    onSave(form);
+    onSave({
+      ...form,
+      hours: Number(form.hours),
+    });
   };
 
   return (
@@ -29,7 +32,7 @@ function EntryModal({ onClose, onSave, editingEntry }) {
 
       <input
         type="date"
-        name="date"
+        name="entry_date"
         value={form.date}
         onChange={handleChange}
       />

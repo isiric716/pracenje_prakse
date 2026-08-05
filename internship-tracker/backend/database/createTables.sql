@@ -142,6 +142,15 @@ CREATE TABLE IF NOT EXISTS entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     internship_id INTEGER NOT NULL,
     entry_date TEXT NOT NULL,
+    mentor_comment TEXT,
+    status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (
+        status IN (
+            'pending',
+            'approved',
+            'rejected'
+        )
+    ),
 
     hours REAL NOT NULL
         CHECK (hours > 0 AND hours <= 24),

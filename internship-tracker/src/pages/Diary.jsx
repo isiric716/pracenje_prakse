@@ -36,7 +36,7 @@ function Diary({ user }) {
       fetch("http://localhost:3001/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...entry, studentId: 1, mentorId: 1 }),
+        body: JSON.stringify(entry),
       })
         .then((res) => res.json())
         .then((newEntry) => {
@@ -63,7 +63,7 @@ function Diary({ user }) {
   };
 
   const sortedEntries = [...entries].sort(
-    (a, b) => new Date(b.date) - new Date(a.date)
+    (a, b) => new Date(b.entry_date) - new Date(a.entry_date)
   );
 
   return (
@@ -98,7 +98,7 @@ function Diary({ user }) {
               ) : (
                 sortedEntries.map((e) => (
                   <tr key={e.id}>
-                    <td>{e.date}</td>
+                    <td>{e.entry_date}</td>
                     <td>{e.hours} h</td>
                     <td>{e.description}</td>
                     <td>
@@ -218,7 +218,7 @@ function Diary({ user }) {
 
 function EntryModal({ onClose, onSave, editingEntry }) {
   const [form, setForm] = useState({
-    date: editingEntry?.date || "",
+    entry_date: editingEntry?.entry_date || "",
     hours: editingEntry?.hours || "",
     description: editingEntry?.description || "",
   });
@@ -228,7 +228,7 @@ function EntryModal({ onClose, onSave, editingEntry }) {
   };
 
   const handleSubmit = () => {
-    if (!form.date || !form.hours || !form.description) {
+    if (!form.entry_date || !form.hours || !form.description) {
       alert("Popuni sva polja!");
       return;
     }
@@ -246,7 +246,7 @@ function EntryModal({ onClose, onSave, editingEntry }) {
         <div className="entry-modal-body">
           <div className="doc-field">
             <label>Datum</label>
-            <input type="date" name="date" value={form.date} onChange={handleChange} />
+            <input type="entry_date" name="entry_date" value={form.entry_date} onChange={handleChange} />
           </div>
           <div className="doc-field">
             <label>Broj sati</label>

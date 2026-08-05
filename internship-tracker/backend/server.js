@@ -46,61 +46,96 @@ app.get("/companies", (req, res) => {
   }
 });
 
-
 app.get("/entries", (req, res) => {
-  res.json(entries);
-});
+  try {
+    const entries = db
+      .prepare(`
+        SELECT id, internship_id, entry_date, mentor_comment, status, hours
+        FROM entries
+        ORDER BY entry_date DESC
+      `)
+      .all();
 
-app.get("/mentors/:mentorId/entries", (req, res) => {
-  const mentorId = Number(req.params.mentorId);
+    res.json(entries);
+  } catch (error) {
+    console.error("Greška pri dohvaćanju zapis:", error);
 
-  const mentorEntries = entries.filter(
-    (entry) => entry.mentorId === mentorId
-  );
-
-  res.json(mentorEntries);
+    res.status(500).json({
+      error: "Nije moguće dohvatiti zapise.",
+    });
+  }
 });
 
 app.post("/entries", (req, res) => {
-  const newEntry = {
-    id: Date.now(),
-    ...req.body,
-    status: "pending",
-  };
+  try {
+    const studentId = 2;
 
-  entries.push(newEntry);
-  res.json(newEntry);
+    const { entry_date, hours, description } = req.body;
+
+    if (!entry_date || !hours || !description) {
+      return res.status(400).json({
+        error: "Datum, broj sati i opis su obavezni.",
+      });
+    }
+
+    const activeInternship = db
+      .prepare(`
+        SELECT id
+        FROM internships
+        WHERE student_id = ?
+          AND status = 'active'
+      `)
+      .get(studentId);
+
+    if (!activeInternship) {
+      return res.status(400).json({
+        error: "Student nema aktivnu stručnu praksu.",
+      });
+    }
+
+    const result = db
+      .prepare(`
+        INSERT INTO entries (
+          internship_id,
+          entry_date,
+          hours,
+          description
+        )
+        VALUES (?, ?, ?, ?)
+      `)
+      .run(
+        activeInternship.id,
+        entry_date,
+        hours,
+        description
+      );
+
+    const newEntry = db
+      .prepare(`
+        SELECT
+          id,
+          internship_id,
+          entry_date,
+          hours,
+          description,
+          status,
+          mentor_comment
+        FROM entries
+        WHERE id = ?
+      `)
+      .get(result.lastInsertRowid);
+
+    res.status(201).json(newEntry);
+  } catch (error) {
+    console.error("Greška pri spremanju zapisa:", error);
+
+    res.status(500).json({
+      error: "Nije moguće spremiti zapis.",
+    });
+  }
 });
 
-app.put("/entries/:id", (req, res) => {
-  const id = Number(req.params.id);
 
-  entries = entries.map((entry) =>
-    entry.id === id ? { ...entry, ...req.body } : entry
-  );
-
-  const updatedEntry = entries.find((entry) => entry.id === id);
-  res.json(updatedEntry);
-});
-
-app.patch("/entries/:id/approve", (req, res) => {
-  const id = Number(req.params.id);
-
-  entries = entries.map((entry) =>
-    entry.id === id ? { ...entry, status: "approved" } : entry
-  );
-
-  const approvedEntry = entries.find((entry) => entry.id === id);
-
-  res.json(approvedEntry);
-});
-
-app.delete("/entries/:id", (req, res) => {
-  const id = Number(req.params.id);
-  entries = entries.filter((entry) => entry.id !== id);
-
-  res.json({ message: "Zapis obrisan" });
-});
 
 const { execSync } = require("child_process");
 const path = require("path");
