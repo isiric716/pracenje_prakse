@@ -50,7 +50,7 @@ app.get("/entries", (req, res) => {
   try {
     const entries = db
       .prepare(`
-        SELECT id, internship_id, entry_date, mentor_comment, status, hours
+        SELECT id, internship_id, entry_date, mentor_comment, status, hours, description
         FROM entries
         ORDER BY entry_date DESC
       `)
@@ -131,6 +131,143 @@ app.post("/entries", (req, res) => {
 
     res.status(500).json({
       error: "Nije moguće spremiti zapis.",
+    });
+  }
+});
+
+app.put("/entries/:id", (req, res) => {
+  try {
+    const studentId = 2;
+    const entryId = Number(req.params.id);
+
+    const { entry_date, hours, description } = req.body;
+
+    if (!Number.isInteger(entryId)) {
+      return res.status(400).json({
+        error: "ID zapisa nije ispravan.",
+      });
+    }
+
+    if (!entry_date || !hours || !description) {
+      return res.status(400).json({
+        error: "Datum, broj sati i opis su obavezni.",
+      });
+    }
+
+    const existingEntry = db
+      .prepare(`
+        SELECT
+          e.id,
+          e.status
+        FROM entries AS e
+        INNER JOIN internships AS i
+          ON e.internship_id = i.id
+        WHERE e.id = ?
+          AND i.student_id = ?
+      `)
+      .get(entryId, studentId);
+
+    if (!existingEntry) {
+      return res.status(404).json({
+        error: "Zapis nije pronađen.",
+      });
+    }
+
+    if (existingEntry.status !== "pending") {
+      return res.status(409).json({
+        error: "Zaključani zapis nije moguće uređivati.",
+      });
+    }
+
+    db.prepare(`
+      UPDATE entries
+      SET
+        entry_date = ?,
+        hours = ?,
+        description = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      entry_date,
+      hours,
+      description,
+      entryId
+    );
+
+    const updatedEntry = db
+      .prepare(`
+        SELECT
+          id,
+          internship_id,
+          entry_date,
+          hours,
+          description,
+          status,
+          mentor_comment
+        FROM entries
+        WHERE id = ?
+      `)
+      .get(entryId);
+
+    res.json(updatedEntry);
+  } catch (error) {
+    console.error("Greška pri uređivanju zapisa:", error);
+
+    res.status(500).json({
+      error: "Nije moguće urediti zapis.",
+    });
+  }
+});
+
+app.delete("/entries/:id", (req, res) => {
+  try {
+    const studentId = 2;
+    const entryId = Number(req.params.id);
+
+    if (!Number.isInteger(entryId)) {
+      return res.status(400).json({
+        error: "ID zapisa nije ispravan.",
+      });
+    }
+
+    const existingEntry = db
+      .prepare(`
+        SELECT
+          e.id,
+          e.status
+        FROM entries AS e
+        INNER JOIN internships AS i
+          ON e.internship_id = i.id
+        WHERE e.id = ?
+          AND i.student_id = ?
+      `)
+      .get(entryId, studentId);
+
+    if (!existingEntry) {
+      return res.status(404).json({
+        error: "Zapis nije pronađen.",
+      });
+    }
+
+    if (existingEntry.status !== "pending") {
+      return res.status(409).json({
+        error: "Zaključani zapis nije moguće obrisati.",
+      });
+    }
+
+    db.prepare(`
+      DELETE FROM entries
+      WHERE id = ?
+    `).run(entryId);
+
+    res.json({
+      message: "Zapis je uspješno obrisan.",
+    });
+  } catch (error) {
+    console.error("Greška pri brisanju zapisa:", error);
+
+    res.status(500).json({
+      error: "Nije moguće obrisati zapis.",
     });
   }
 });
