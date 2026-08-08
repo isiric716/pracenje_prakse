@@ -57,7 +57,9 @@ function dataRow(label, value) {
   });
 }
 
-const sortedEntries = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+const sortedEntries = [...entries].sort(
+  (a, b) => new Date(a.entry_date) - new Date(b.entry_date)
+);
 
 const diaryRows = [];
 diaryRows.push(new TableRow({
@@ -85,7 +87,7 @@ sortedEntries.forEach((entry, i) => {
         margins: { top: 80, bottom: 80, left: 120, right: 120 },
         shading: { fill: "EEF2F9", type: ShadingType.CLEAR },
         children: [new Paragraph({
-          children: [new TextRun({ text: `Dan ${i + 1} – ${entry.date}  (${entry.hours} sati)`, bold: true, size: 20, font: "Arial" })]
+          children: [new TextRun({ text: `Dan ${i + 1} – ${entry.entry_date}  (${entry.hours} sati)`, bold: true, size: 20, font: "Arial" })]
         })]
       })
     ]

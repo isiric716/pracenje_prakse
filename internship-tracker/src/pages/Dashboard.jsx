@@ -3,35 +3,62 @@ import { useNavigate } from "react-router-dom";
 
 function Dashboard({ user }) {
   const [entries, setEntries] = useState([]);
+  const [internship, setInternship] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetch("http://localhost:3001/entries")
-      .then((res) => res.json())
-      .then((data) => {
-        setEntries(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+ useEffect(() => {
+  Promise.all([
+    fetch("http://localhost:3001/entries"),
+    fetch("http://localhost:3001/internships/active"),
+  ])
+    .then(async ([entriesResponse, internshipResponse]) => {
+      if (!entriesResponse.ok) {
+        throw new Error("Nije moguće dohvatiti zapise.");
+      }
 
-  const totalHours = Number(user?.hours) || 80;
-  const completedHours = entries
-    .filter((e) => e.status === "approved")
-    .reduce((sum, e) => sum + Number(e.hours), 0);
-  const remainingHours = totalHours - completedHours;
-  const progressPercent = Math.round((completedHours / totalHours) * 100);
+      if (!internshipResponse.ok) {
+        throw new Error("Nije moguće dohvatiti aktivnu praksu.");
+      }
+
+      const entriesData = await entriesResponse.json();
+      const internshipData = await internshipResponse.json();
+
+      setEntries(entriesData);
+      setInternship(internshipData);
+      setLoading(false);
+    })
+    .catch((error) => {
+      console.error("Greška pri učitavanju Dashboarda:", error);
+      throw error;
+    });
+  },
+  []);
+
+
+ const totalHours = internship.required_hours;
+
+ const completedHours = entries.reduce(
+    (sum, entry) => sum + Number(entry.hours),
+    0
+  );
+
+ const remainingHours = Math.max(totalHours - completedHours, 0);
+
+ const progressPercent = Math.min(
+    Math.round((completedHours / totalHours) * 100),
+    100
+  );
 
   const recentEntries = [...entries]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date))
     .slice(0, 5);
 
   // Podaci za tjedni graf (zadnjih 7 tjedana)
   const weeklyData = Array.from({ length: 7 }, (_, i) => {
     const weekLabel = `T${i + 1}`;
     const weekEntries = entries.filter((e) => {
-      const entryDate = new Date(e.date);
+      const entryDate = new Date(e.entry_date);
       const now = new Date();
       const weekStart = new Date(now);
       weekStart.setDate(now.getDate() - (6 - i) * 7);
@@ -102,11 +129,6 @@ function Dashboard({ user }) {
         />
       );
     });
-  };
-
-  const statusLabel = (status) => {
-    if (status === "approved") return { text: "Završeno", color: "#10b981" };
-    return { text: "U tijeku", color: "#3b82f6" };
   };
 
   if (loading) {
@@ -224,16 +246,13 @@ function Dashboard({ user }) {
               </tr>
             ) : (
               recentEntries.map((e) => {
-                const s = statusLabel(e.status);
                 return (
                   <tr key={e.id}>
-                    <td>{e.date}</td>
+                    <td>{e.entry_date}</td>
                     <td>{e.hours} h</td>
                     <td>{e.description}</td>
                     <td>
-                      <span className="status-badge" style={{ color: s.color }}>
-                        {s.text}
-                      </span>
+                       <span className="status-badge">Zapisano</span>
                     </td>
                   </tr>
                 );

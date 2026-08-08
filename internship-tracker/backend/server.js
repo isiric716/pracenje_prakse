@@ -319,28 +319,122 @@ const path = require("path");
 const fs = require("fs");
 
 app.post("/generate-doc", (req, res) => {
-  const { student, docInfo } = req.body;
-  const studentId = req.body.studentId || 1;
-
-  const studentEntries = entries.filter((e) => e.studentId === studentId);
-
-  const data = { student, docInfo, entries: studentEntries };
-  const outputPath = path.join(__dirname, "dnevnik_prakse.docx");
-  const scriptPath = path.join(__dirname, "generateDoc.js");
-  const tempPath = path.join(__dirname, "temp_data.json");
-
   try {
+    const studentId = 2;
+    const { docInfo } = req.body;
+
+    if (!docInfo) {
+      return res.status(400).json({
+        error: "Nedostaju podaci za dokument.",
+      });
+    }
+
+    const internship = db
+      .prepare(`
+        SELECT
+          i.id,
+          i.start_date,
+          i.end_date,
+          c.name AS company_name,
+          c.city AS company_city,
+          student.first_name AS student_first_name,
+          student.last_name AS student_last_name,
+          mentor.first_name AS mentor_first_name,
+          mentor.last_name AS mentor_last_name,
+          mentor.email AS mentor_email
+        FROM internships AS i
+        INNER JOIN companies AS c
+          ON i.company_id = c.id
+        INNER JOIN users AS student
+          ON i.student_id = student.id
+        INNER JOIN users AS mentor
+          ON i.mentor_id = mentor.id
+        WHERE i.student_id = ?
+          AND i.status = 'active'
+      `)
+      .get(studentId);
+
+    if (!internship) {
+      return res.status(404).json({
+        error: "Aktivna praksa nije pronađena.",
+      });
+    }
+
+    const studentEntries = db
+      .prepare(`
+        SELECT
+          entry_date,
+          hours,
+          description
+        FROM entries
+        WHERE internship_id = ?
+        ORDER BY entry_date
+      `)
+      .all(internship.id);
+
+    const student = {
+      fullName: `${internship.student_first_name} ${internship.student_last_name}`,
+    };
+
+    const documentInfo = {
+      ...docInfo,
+      companyName: `${internship.company_name}, ${internship.company_city}`,
+      mentor: `${internship.mentor_first_name} ${internship.mentor_last_name}`,
+      mentorEmail: internship.mentor_email,
+      startDate: internship.start_date,
+      endDate: internship.end_date,
+    };
+
+    const data = {
+      student,
+      docInfo: documentInfo,
+      entries: studentEntries,
+    };
+
+    const requestId = require("crypto").randomUUID();
+
+    const tempPath = path.join(
+      __dirname,
+      `temp_data_${requestId}.json`
+    );
+
+    const outputPath = path.join(
+      __dirname,
+      `dnevnik_prakse_${requestId}.docx`
+    );
+
+    const scriptPath = path.join(__dirname, "generateDoc.js");
+
     fs.writeFileSync(tempPath, JSON.stringify(data));
-    execSync(`node "${scriptPath}" "${tempPath}" "${outputPath}"`);
-    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-    res.download(outputPath, "Dnevnik_strucne_prakse.docx", () => {
-      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+
+    execSync(
+      `node "${scriptPath}" "${tempPath}" "${outputPath}"`
+    );
+
+    fs.unlinkSync(tempPath);
+
+    res.download(
+      outputPath,
+      "Dnevnik_strucne_prakse.docx",
+      (error) => {
+        if (fs.existsSync(outputPath)) {
+          fs.unlinkSync(outputPath);
+        }
+
+        if (error) {
+          console.error("Greška pri preuzimanju dokumenta:", error);
+        }
+      }
+    );
+  } catch (error) {
+    console.error("Greška pri generiranju dokumenta:", error);
+
+    res.status(500).json({
+      error: "Greška pri generiranju dokumenta.",
     });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: "Greška pri generiranju dokumenta" });
   }
 });
+
 
 app.listen(3001, () => {
   console.log("Backend radi na http://localhost:3001");
