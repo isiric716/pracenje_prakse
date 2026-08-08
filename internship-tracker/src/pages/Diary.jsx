@@ -17,6 +17,19 @@ function Diary({ user }) {
     fetch("http://localhost:3001/entries")
       .then((res) => res.json())
       .then((data) => setEntries(data));
+
+    fetch("http://localhost:3001/internships/active")
+      .then((res) => res.json())
+      .then((data) => {
+        setDocData({
+          companyName: data.company_name,
+          mentor: data.mentor_name,
+          study: "",
+          indexNumber: "",
+          startDate: data.start_date,
+          endDate: data.end_date,
+        });
+      });
   }, []);
 
   const handleSaveEntry = (entry) => {

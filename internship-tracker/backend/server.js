@@ -46,6 +46,46 @@ app.get("/companies", (req, res) => {
   }
 });
 
+app.get("/internships/active", (req, res) => {
+  try {
+    const studentId = 2;
+
+    const internship = db
+      .prepare(`
+        SELECT
+          i.id,
+          c.name AS company_name,
+          u.first_name || ' ' || u.last_name AS mentor_name,
+          i.start_date,
+          i.end_date,
+          i.required_hours,
+          i.status
+        FROM internships AS i
+        INNER JOIN companies AS c
+          ON i.company_id = c.id
+        INNER JOIN users AS u
+          ON i.mentor_id = u.id
+        WHERE i.student_id = ?
+          AND i.status = 'active'
+      `)
+      .get(studentId);
+
+    if (!internship) {
+      return res.status(404).json({
+        error: "Aktivna praksa nije pronađena.",
+      });
+    }
+
+    res.json(internship);
+  } catch (error) {
+    console.error("Greška pri dohvaćanju aktivne prakse:", error);
+
+    res.status(500).json({
+      error: "Nije moguće dohvatiti aktivnu praksu.",
+    });
+  }
+});
+
 app.get("/entries", (req, res) => {
   try {
     const entries = db
