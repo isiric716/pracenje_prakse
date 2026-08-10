@@ -46,6 +46,44 @@ app.get("/companies", (req, res) => {
   }
 });
 
+app.get("/users/current", (req, res) => {
+  try {
+    const studentId = 2;
+
+    const user = db
+      .prepare(`
+        SELECT
+          id,
+          first_name,
+          last_name,
+          email,
+          role
+        FROM users
+        WHERE id = ?
+      `)
+      .get(studentId);
+
+    if (!user) {
+      return res.status(404).json({
+        error: "Korisnik nije pronađen.",
+      });
+    }
+
+    res.json({
+      id: user.id,
+      fullName: `${user.first_name} ${user.last_name}`,
+      email: user.email,
+      role: user.role,
+    });
+  } catch (error) {
+    console.error("Greška pri dohvaćanju korisnika:", error);
+
+    res.status(500).json({
+      error: "Nije moguće dohvatiti korisnika.",
+    });
+  }
+});
+
 app.get("/internships/active", (req, res) => {
   try {
     const studentId = 2;

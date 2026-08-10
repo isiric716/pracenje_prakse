@@ -1,6 +1,6 @@
 import "./App.css";
 import { BrowserRouter, Routes, Route, NavLink, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Diary from "./pages/Diary";
@@ -60,7 +60,7 @@ function AppLayout({ children, user }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
 
-  const displayName = user?.fullName || "Ivona Širić";
+  const displayName = user?.fullName || "";
   const displayRole = user?.role === "mentor" ? "Mentor" : "Student";
   const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
@@ -151,6 +151,20 @@ function AppLayout({ children, user }) {
 
 function AppRoutes() {
   const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    fetch("http://localhost:3001/users/current")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Nije moguće dohvatiti korisnika.");
+        }
+
+        return response.json();
+      })
+      .then((data) => {
+        setUser(data);
+      });
+  }, []);
 
   return (
     <Routes>
