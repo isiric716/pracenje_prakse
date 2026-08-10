@@ -1,10 +1,99 @@
 const express = require("express");
 const cors = require("cors");
 const db = require("./db");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const app = express();
+const { execSync } = require("child_process");
+const path = require("path");
+const fs = require("fs");
+process.loadEnvFile(path.join(__dirname, ".env"));
+
+const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+  throw new Error("JWT_SECRET nije postavljen.");
+}
 
 app.use(cors());
 app.use(express.json());
+
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "Email i lozinka su obavezni.",
+      });
+    }
+
+    const user = db
+      .prepare(`
+        SELECT
+          id,
+          first_name,
+          last_name,
+          email,
+          password_hash,
+          role,
+          is_active
+        FROM users
+        WHERE email = ?
+      `)
+      .get(email);
+
+    if (!user) {
+      return res.status(401).json({
+        error: "Email ili lozinka nisu ispravni.",
+      });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({
+        error: "Korisnički račun nije aktivan.",
+      });
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      password,
+      user.password_hash
+    );
+
+    if (!passwordMatches) {
+      return res.status(401).json({
+        error: "Email ili lozinka nisu ispravni.",
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        role: user.role,
+      },
+      jwtSecret,
+      {
+        expiresIn: "8h",
+      }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        fullName: `${user.first_name} ${user.last_name}`,
+        email: user.email,
+        role: user.role,
+      },
+    });
+      } catch (error) {
+        console.error("Greška pri prijavi:", error);
+
+        res.status(500).json({
+          error: "Prijava nije uspjela.",
+        });
+      }
+    });
 
 app.get("/faculties", (req, res) => {
   try {
@@ -352,20 +441,24 @@ app.delete("/entries/:id", (req, res) => {
 
 
 
-const { execSync } = require("child_process");
-const path = require("path");
-const fs = require("fs");
 
-app.post("/generate-doc", (req, res) => {
+
+app.post("/documents/submit", (req, res) => {
+  const studentId = 2;
+  const { docInfo } = req.body;
+
+  if (!docInfo) {
+    return res.status(400).json({
+      error: "Nedostaju podaci za dokument.",
+    });
+  }
+
+  const requestId = require("crypto").randomUUID();
+  let tempPath;
+  let newFilePath;
+
   try {
-    const studentId = 2;
-    const { docInfo } = req.body;
-
-    if (!docInfo) {
-      return res.status(400).json({
-        error: "Nedostaju podaci za dokument.",
-      });
-    }
+    db.exec("BEGIN IMMEDIATE");
 
     const internship = db
       .prepare(`
@@ -393,10 +486,42 @@ app.post("/generate-doc", (req, res) => {
       .get(studentId);
 
     if (!internship) {
+      db.exec("ROLLBACK");
+
       return res.status(404).json({
         error: "Aktivna praksa nije pronađena.",
       });
     }
+
+    const existingDocument = db
+      .prepare(`
+        SELECT
+          id,
+          status,
+          version_number,
+          file_path
+        FROM documents
+        WHERE internship_id = ?
+      `)
+      .get(internship.id);
+
+    if (
+      existingDocument &&
+      !["draft", "rejected"].includes(existingDocument.status)
+    ) {
+      db.exec("ROLLBACK");
+
+      return res.status(409).json({
+        error:
+          existingDocument.status === "pending"
+            ? "Dokument je već poslan mentoru."
+            : "Odobreni dokument više nije moguće mijenjati.",
+      });
+    }
+
+    const versionNumber = existingDocument
+      ? existingDocument.version_number + 1
+      : 1;
 
     const studentEntries = db
       .prepare(`
@@ -410,35 +535,35 @@ app.post("/generate-doc", (req, res) => {
       `)
       .all(internship.id);
 
-    const student = {
-      fullName: `${internship.student_first_name} ${internship.student_last_name}`,
-    };
-
-    const documentInfo = {
-      ...docInfo,
-      companyName: `${internship.company_name}, ${internship.company_city}`,
-      mentor: `${internship.mentor_first_name} ${internship.mentor_last_name}`,
-      mentorEmail: internship.mentor_email,
-      startDate: internship.start_date,
-      endDate: internship.end_date,
-    };
-
     const data = {
-      student,
-      docInfo: documentInfo,
+      student: {
+        fullName: `${internship.student_first_name} ${internship.student_last_name}`,
+      },
+      docInfo: {
+        ...docInfo,
+        companyName: `${internship.company_name}, ${internship.company_city}`,
+        mentor: `${internship.mentor_first_name} ${internship.mentor_last_name}`,
+        mentorEmail: internship.mentor_email,
+        startDate: internship.start_date,
+        endDate: internship.end_date,
+      },
       entries: studentEntries,
     };
 
-    const requestId = require("crypto").randomUUID();
+    const documentsDirectory = path.join(__dirname, "documents");
 
-    const tempPath = path.join(
+    if (!fs.existsSync(documentsDirectory)) {
+      fs.mkdirSync(documentsDirectory);
+    }
+
+    tempPath = path.join(
       __dirname,
       `temp_data_${requestId}.json`
     );
 
-    const outputPath = path.join(
-      __dirname,
-      `dnevnik_prakse_${requestId}.docx`
+    newFilePath = path.join(
+      documentsDirectory,
+      `internship_${internship.id}_v${versionNumber}_${requestId}.docx`
     );
 
     const scriptPath = path.join(__dirname, "generateDoc.js");
@@ -446,29 +571,84 @@ app.post("/generate-doc", (req, res) => {
     fs.writeFileSync(tempPath, JSON.stringify(data));
 
     execSync(
-      `node "${scriptPath}" "${tempPath}" "${outputPath}"`
+      `node "${scriptPath}" "${tempPath}" "${newFilePath}"`
     );
 
     fs.unlinkSync(tempPath);
+    tempPath = null;
 
-    res.download(
-      outputPath,
-      "Dnevnik_strucne_prakse.docx",
-      (error) => {
-        if (fs.existsSync(outputPath)) {
-          fs.unlinkSync(outputPath);
-        }
+    if (existingDocument) {
+      db.prepare(`
+        UPDATE documents
+        SET
+          status = 'pending',
+          version_number = ?,
+          file_name = ?,
+          file_path = ?,
+          submitted_at = CURRENT_TIMESTAMP,
+          approved_at = NULL,
+          approved_by = NULL,
+          mentor_comment = NULL,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(
+        versionNumber,
+        path.basename(newFilePath),
+        newFilePath,
+        existingDocument.id
+      );
+    } else {
+      db.prepare(`
+        INSERT INTO documents (
+          internship_id,
+          status,
+          version_number,
+          file_name,
+          file_path,
+          submitted_at
+        )
+        VALUES (?, 'pending', ?, ?, ?, CURRENT_TIMESTAMP)
+      `).run(
+        internship.id,
+        versionNumber,
+        path.basename(newFilePath),
+        newFilePath
+      );
+    }
 
-        if (error) {
-          console.error("Greška pri preuzimanju dokumenta:", error);
-        }
-      }
-    );
+    db.exec("COMMIT");
+
+    if (
+      existingDocument?.file_path &&
+      fs.existsSync(existingDocument.file_path)
+    ) {
+      fs.unlinkSync(existingDocument.file_path);
+    }
+
+    res.status(201).json({
+      message: "Dokument je uspješno poslan mentoru.",
+      status: "pending",
+      version_number: versionNumber,
+    });
   } catch (error) {
-    console.error("Greška pri generiranju dokumenta:", error);
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // Transakcija je možda već završena.
+    }
+
+    if (tempPath && fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath);
+    }
+
+    if (newFilePath && fs.existsSync(newFilePath)) {
+      fs.unlinkSync(newFilePath);
+    }
+
+    console.error("Greška pri slanju dokumenta:", error);
 
     res.status(500).json({
-      error: "Greška pri generiranju dokumenta.",
+      error: "Dokument nije moguće poslati mentoru.",
     });
   }
 });

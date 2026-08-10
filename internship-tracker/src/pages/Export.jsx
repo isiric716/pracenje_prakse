@@ -46,36 +46,34 @@ function Export({ user }) {
   };
 
   const handleGenerate = async () => {
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      const response = await fetch("http://localhost:3001/generate-doc", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          docInfo,
-        }),
-      });
+  try {
+    const response = await fetch("http://localhost:3001/documents/submit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        docInfo,
+      }),
+    });
 
-      if (!response.ok) {
-        throw new Error("Greška pri generiranju dokumenta.");
-      }
+    const data = await response.json();
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "Dnevnik_strucne_prakse.docx";
-      link.click();
-
-      window.URL.revokeObjectURL(url);
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      throw new Error(data.error);
     }
-  };
+
+    alert(
+      `Dokument je poslan mentoru. Verzija dokumenta: ${data.version_number}`
+    );
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const totalHours = entries.reduce(
     (sum, entry) => sum + Number(entry.hours),

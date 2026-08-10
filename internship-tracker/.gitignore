@@ -12,7 +12,7 @@ dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# Editor 
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -23,7 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Backend local files
+# Backend 
 backend/database/internship.db
 backend/temp_data.json
 backend/dnevnik_prakse.docx
+backend/.env

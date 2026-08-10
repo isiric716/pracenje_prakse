@@ -54,7 +54,7 @@ VALUES
         'Super',
         'Administrator',
         'admin@practice-app.hr',
-        'TEMP_HASH_ADMIN',
+        '$2b$10$AZXEk9A.ap.5wj3PgDjJxeL4GJFU9zKuDmieeBxeQgRoO7Rq14ne2',
         'super_admin'
     ),
     (
@@ -64,7 +64,7 @@ VALUES
         'Ivona',
         'Student',
         'ivona@student.hr',
-        'TEMP_HASH_STUDENT',
+        '$2b$10$8jBFcroH0AAXolJ7shpuiO9WEqxVdZbrS7LFJ9kTsehpcxuxyqrk2',
         'student'
     ),
     (
@@ -74,7 +74,7 @@ VALUES
         'Marko',
         'Mentor',
         'marko@be-terna.com',
-        'TEMP_HASH_MENTOR',
+        '$2b$10$ReVEbhph9zO1ix4YPTElK.jbQR2W/66U4V1.OcuY7rLrRDicS5bzy',
         'mentor'
     );
 
