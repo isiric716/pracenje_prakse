@@ -22,27 +22,53 @@ function Auth({ mode, onClose, onSwitchMode, onLogin }) {
     });
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
+  if (isRegister) {
+    alert("Registraciju još nismo povezali s bazom.");
+    return;
+    }
+
     if (!formData.email || !formData.password) {
       alert("Email i lozinka su obavezni!");
       return;
     }
 
-    if (isRegister && !formData.fullName) {
-      alert("Unesi ime i prezime!");
-      return;
+    try {
+      const response = await fetch("http://localhost:3001/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error);
+      }
+
+      localStorage.setItem("token", data.token);
+
+      onLogin(data.user);
+
+      if (data.user.role === "student") {
+        navigate("/dashboard");
+        return;
+      }
+
+      if (data.user.role === "mentor") {
+        navigate("/mentor");
+        return;
+      }
+
+      throw new Error("Za ovu korisničku ulogu još ne postoji sučelje.");
+    } catch (error) {
+      alert(error.message);
     }
-
-    if (isRegister && role === "student" && !formData.hours) {
-      alert("Unesi broj sati prakse!");
-      return;
-    }
-
-    if (onLogin) onLogin({ ...formData, role });
-
-    navigate(role === "mentor" ? "/mentor" : "/dashboard", {
-      state: { role, user: formData },
-    });
   }
 
   return (

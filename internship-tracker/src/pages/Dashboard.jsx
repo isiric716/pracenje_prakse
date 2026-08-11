@@ -32,8 +32,16 @@ function Dashboard({ user }) {
       console.error("Greška pri učitavanju Dashboarda:", error);
       throw error;
     });
-  },
+   },
   []);
+  
+  if (loading) {
+    return (
+      <div style={{ color: "var(--text-secondary)", padding: "40px" }}>
+        Učitavanje...
+      </div>
+    );
+  }
 
 
  const totalHours = internship.required_hours;
@@ -131,13 +139,6 @@ function Dashboard({ user }) {
     });
   };
 
-  if (loading) {
-    return (
-      <div style={{ color: "var(--text-secondary)", padding: "40px" }}>
-        Učitavanje...
-      </div>
-    );
-  }
 
   return (
     <div className="dashboard">

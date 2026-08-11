@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 function Diary({ user }) {
+  const token = localStorage.getItem("token");
   const [entries, setEntries] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -14,29 +15,58 @@ function Diary({ user }) {
   });
 
   useEffect(() => {
-    fetch("http://localhost:3001/entries")
-      .then((res) => res.json())
-      .then((data) => setEntries(data));
+  fetch("http://localhost:3001/entries", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error("Nije moguće dohvatiti zapise.");
+      }
 
-    fetch("http://localhost:3001/internships/active")
-      .then((res) => res.json())
-      .then((data) => {
-        setDocData({
-          companyName: data.company_name,
-          mentor: data.mentor_name,
-          study: "",
-          indexNumber: "",
-          startDate: data.start_date,
-          endDate: data.end_date,
-        });
+      return res.json();
+    })
+    .then((data) => setEntries(data))
+    .catch((error) => {
+      console.error("Greška pri dohvaćanju zapisa:", error);
+    });
+
+  fetch("http://localhost:3001/internships/active", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error("Nije moguće dohvatiti aktivnu praksu.");
+      }
+
+      return res.json();
+    })
+    .then((data) => {
+      setDocData({
+        companyName: data.company_name,
+        mentor: data.mentor_name,
+        study: "",
+        indexNumber: "",
+        startDate: data.start_date,
+        endDate: data.end_date,
       });
-  }, []);
+    })
+    .catch((error) => {
+      console.error("Greška pri dohvaćanju prakse:", error);
+    });
+}, [token]);
 
   const handleSaveEntry = (entry) => {
     if (editingEntry) {
       fetch(`http://localhost:3001/entries/${editingEntry.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(entry),
       })
         .then((res) => res.json())
@@ -48,7 +78,10 @@ function Diary({ user }) {
     } else {
       fetch("http://localhost:3001/entries", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(entry),
       })
         .then((res) => res.json())
@@ -60,7 +93,12 @@ function Diary({ user }) {
   };
 
   const handleDelete = (id) => {
-    fetch(`http://localhost:3001/entries/${id}`, { method: "DELETE" }).then(() => {
+    fetch(`http://localhost:3001/entries/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }).then(() => {
       setEntries(entries.filter((e) => e.id !== id));
     });
   };
@@ -259,7 +297,7 @@ function EntryModal({ onClose, onSave, editingEntry }) {
         <div className="entry-modal-body">
           <div className="doc-field">
             <label>Datum</label>
-            <input type="entry_date" name="entry_date" value={form.entry_date} onChange={handleChange} />
+            <input type="date" name="entry_date" value={form.entry_date} onChange={handleChange} />
           </div>
           <div className="doc-field">
             <label>Broj sati</label>

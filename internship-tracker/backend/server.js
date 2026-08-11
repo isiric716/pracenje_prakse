@@ -15,6 +15,36 @@ if (!jwtSecret) {
   throw new Error("JWT_SECRET nije postavljen.");
 }
 
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({
+      error: "Nedostaje autentikacijski token.",
+    });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({
+      error: "Token nije ispravno poslan.",
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, jwtSecret);
+
+    req.user = decoded;
+
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      error: "Token nije važeći ili je istekao.",
+    });
+  }
+}
+
 app.use(cors());
 app.use(express.json());
 
@@ -135,9 +165,9 @@ app.get("/companies", (req, res) => {
   }
 });
 
-app.get("/users/current", (req, res) => {
+app.get("/users/current", authenticateToken, (req, res) => {
   try {
-    const studentId = 2;
+    const studentId = req.user.userId;
 
     const user = db
       .prepare(`
@@ -173,9 +203,9 @@ app.get("/users/current", (req, res) => {
   }
 });
 
-app.get("/internships/active", (req, res) => {
+app.get("/internships/active", authenticateToken, (req, res) => {
   try {
-    const studentId = 2;
+    const studentId = req.user.userId;
 
     const internship = db
       .prepare(`
@@ -213,19 +243,31 @@ app.get("/internships/active", (req, res) => {
   }
 });
 
-app.get("/entries", (req, res) => {
+app.get("/entries", authenticateToken, (req, res) => {
   try {
+    const studentId = req.user.userId;
+
     const entries = db
       .prepare(`
-        SELECT id, internship_id, entry_date, mentor_comment, status, hours, description
-        FROM entries
-        ORDER BY entry_date DESC
+        SELECT
+          e.id,
+          e.internship_id,
+          e.entry_date,
+          e.mentor_comment,
+          e.status,
+          e.hours,
+          e.description
+        FROM entries AS e
+        INNER JOIN internships AS i
+          ON e.internship_id = i.id
+        WHERE i.student_id = ?
+        ORDER BY e.entry_date DESC
       `)
-      .all();
+      .all(studentId);
 
     res.json(entries);
   } catch (error) {
-    console.error("Greška pri dohvaćanju zapis:", error);
+    console.error("Greška pri dohvaćanju zapisa:", error);
 
     res.status(500).json({
       error: "Nije moguće dohvatiti zapise.",
@@ -233,9 +275,9 @@ app.get("/entries", (req, res) => {
   }
 });
 
-app.post("/entries", (req, res) => {
+app.post("/entries", authenticateToken, (req, res) => {
   try {
-    const studentId = 2;
+    const studentId = req.user.userId;
 
     const { entry_date, hours, description } = req.body;
 
@@ -302,9 +344,9 @@ app.post("/entries", (req, res) => {
   }
 });
 
-app.put("/entries/:id", (req, res) => {
+app.put("/entries/:id", authenticateToken, (req, res) => {
   try {
-    const studentId = 2;
+    const studentId = req.user.userId;
     const entryId = Number(req.params.id);
 
     const { entry_date, hours, description } = req.body;
@@ -386,9 +428,9 @@ app.put("/entries/:id", (req, res) => {
   }
 });
 
-app.delete("/entries/:id", (req, res) => {
+app.delete("/entries/:id", authenticateToken, (req, res) => {
   try {
-    const studentId = 2;
+    const studentId = req.user.userId;
     const entryId = Number(req.params.id);
 
     if (!Number.isInteger(entryId)) {
@@ -443,8 +485,8 @@ app.delete("/entries/:id", (req, res) => {
 
 
 
-app.post("/documents/submit", (req, res) => {
-  const studentId = 2;
+app.post("/documents/submit", authenticateToken, (req, res) => {
+  const studentId = req.user.userId;
   const { docInfo } = req.body;
 
   if (!docInfo) {
