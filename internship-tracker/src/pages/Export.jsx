@@ -4,7 +4,7 @@ function Export({ user }) {
   const [entries, setEntries] = useState([]);
   const [internship, setInternship] = useState(null);
   const [loading, setLoading] = useState(false);
-
+  const [submitting, setSubmitting] = useState(false);
   const [docInfo, setDocInfo] = useState({
     indexNumber: "",
     study: "",
@@ -18,23 +18,33 @@ function Export({ user }) {
   });
 
   useEffect(() => {
-    Promise.all([
-      fetch("http://localhost:3001/entries"),
-      fetch("http://localhost:3001/internships/active"),
-    ]).then(async ([entriesResponse, internshipResponse]) => {
-      if (!entriesResponse.ok) {
-        throw new Error("Nije moguće dohvatiti zapise.");
-      }
+  const token = localStorage.getItem("token");
 
-      if (!internshipResponse.ok) {
-        throw new Error("Nije moguće dohvatiti aktivnu praksu.");
-      }
+  Promise.all([
+    fetch("http://localhost:3001/entries", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+    fetch("http://localhost:3001/internships/active", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+  ]).then(async ([entriesResponse, internshipResponse]) => {
+    if (!entriesResponse.ok) {
+      throw new Error("Nije moguće dohvatiti zapise.");
+    }
 
-      const entriesData = await entriesResponse.json();
-      const internshipData = await internshipResponse.json();
+    if (!internshipResponse.ok) {
+      throw new Error("Nije moguće dohvatiti aktivnu praksu.");
+    }
 
-      setEntries(entriesData);
-      setInternship(internshipData);
+    const entriesData = await entriesResponse.json();
+    const internshipData = await internshipResponse.json();
+
+    setEntries(entriesData);
+    setInternship(internshipData);
     });
   }, []);
 
@@ -46,34 +56,84 @@ function Export({ user }) {
   };
 
   const handleGenerate = async () => {
-  setLoading(true);
+    setLoading(true);
 
-  try {
-    const response = await fetch("http://localhost:3001/documents/submit", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        docInfo,
-      }),
-    });
+    try {
+      const response = await fetch(
+        "http://localhost:3001/documents/generate",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            docInfo,
+          }),
+        }
+      );
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error);
-    }
-
-    alert(
-      `Dokument je poslan mentoru. Verzija dokumenta: ${data.version_number}`
-    );
-      } catch (error) {
-        alert(error.message);
-      } finally {
-        setLoading(false);
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error);
       }
-    };
+
+      const blob = await response.blob();
+
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = "dnevnik_strucne_prakse.docx";
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+
+    try {
+      const response = await fetch(
+        "http://localhost:3001/documents/submit",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            docInfo,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error);
+      }
+
+      alert(
+        `Dokument je uspješno poslan mentoru. Verzija dokumenta: ${data.version_number}`
+      );
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };  
 
   const totalHours = entries.reduce(
     (sum, entry) => sum + Number(entry.hours),
@@ -254,6 +314,13 @@ function Export({ user }) {
           disabled={loading}
         >
           {loading ? "Generiranje..." : "⬇ Generiraj dokument (.docx)"}
+        </button>
+        <button
+          className="btn-generate"
+          onClick={handleSubmit}
+          disabled={submitting}
+          >
+          {submitting ? "Slanje..." : "Pošalji mentoru"}
         </button>
       </div>
 

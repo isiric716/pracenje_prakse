@@ -469,7 +469,134 @@ app.delete("/entries/:id", authenticateToken, (req, res) => {
   }
 });
 
+app.post("/documents/generate", authenticateToken, (req, res) => {
+  const studentId = req.user.userId;
+  const { docInfo } = req.body;
 
+  if (!docInfo) {
+    return res.status(400).json({
+      error: "Nedostaju podaci za dokument.",
+    });
+  }
+
+  const requestId = require("crypto").randomUUID();
+
+  const tempDataPath = path.join(
+    __dirname,
+    `temp_data_${requestId}.json`
+  );
+
+  const tempDocumentPath = path.join(
+    __dirname,
+    `temp_document_${requestId}.docx`
+  );
+
+  try {
+    const internship = db
+      .prepare(`
+        SELECT
+          i.id,
+          i.start_date,
+          i.end_date,
+          c.name AS company_name,
+          c.city AS company_city,
+          student.first_name AS student_first_name,
+          student.last_name AS student_last_name,
+          mentor.first_name AS mentor_first_name,
+          mentor.last_name AS mentor_last_name,
+          mentor.email AS mentor_email
+        FROM internships AS i
+        INNER JOIN companies AS c
+          ON i.company_id = c.id
+        INNER JOIN users AS student
+          ON i.student_id = student.id
+        INNER JOIN users AS mentor
+          ON i.mentor_id = mentor.id
+        WHERE i.student_id = ?
+          AND i.status = 'active'
+      `)
+      .get(studentId);
+
+    if (!internship) {
+      return res.status(404).json({
+        error: "Aktivna praksa nije pronađena.",
+      });
+    }
+
+    const studentEntries = db
+      .prepare(`
+        SELECT
+          entry_date,
+          hours,
+          description
+        FROM entries
+        WHERE internship_id = ?
+        ORDER BY entry_date
+      `)
+      .all(internship.id);
+
+    const data = {
+      student: {
+        fullName: `${internship.student_first_name} ${internship.student_last_name}`,
+      },
+      docInfo: {
+        ...docInfo,
+        companyName: `${internship.company_name}, ${internship.company_city}`,
+        mentor: `${internship.mentor_first_name} ${internship.mentor_last_name}`,
+        mentorEmail: internship.mentor_email,
+        startDate: internship.start_date,
+        endDate: internship.end_date,
+      },
+      entries: studentEntries,
+    };
+
+    const scriptPath = path.join(__dirname, "generateDoc.js");
+
+    fs.writeFileSync(
+      tempDataPath,
+      JSON.stringify(data)
+    );
+
+    execSync(
+      `node "${scriptPath}" "${tempDataPath}" "${tempDocumentPath}"`
+    );
+
+    fs.unlinkSync(tempDataPath);
+
+    res.download(
+      tempDocumentPath,
+      "dnevnik_strucne_prakse.docx",
+      (error) => {
+        if (fs.existsSync(tempDocumentPath)) {
+          fs.unlinkSync(tempDocumentPath);
+        }
+
+        if (error) {
+          console.error(
+            "Greška pri preuzimanju dokumenta:",
+            error
+          );
+        }
+      }
+    );
+  } catch (error) {
+    if (fs.existsSync(tempDataPath)) {
+      fs.unlinkSync(tempDataPath);
+    }
+
+    if (fs.existsSync(tempDocumentPath)) {
+      fs.unlinkSync(tempDocumentPath);
+    }
+
+    console.error("Greška pri generiranju dokumenta:", error);
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: "Dokument nije moguće generirati.",
+      });
+    }
+  }
+});
 
 
 
@@ -679,6 +806,252 @@ app.post("/documents/submit", authenticateToken, (req, res) => {
 
     res.status(500).json({
       error: "Dokument nije moguće poslati mentoru.",
+    });
+  }
+});
+
+app.get("/mentor/documents", authenticateToken, (req, res) => {
+  try {
+    const mentorId = req.user.userId;
+
+    if (req.user.role !== "mentor") {
+      return res.status(403).json({
+        error: "Pristup je dopušten samo mentorima.",
+      });
+    }
+
+    const documents = db
+      .prepare(`
+        SELECT
+          d.id,
+          d.status,
+          d.version_number,
+          d.file_name,
+          d.submitted_at,
+          d.mentor_comment,
+          i.id AS internship_id,
+          student.first_name || ' ' || student.last_name AS student_name,
+          student.email AS student_email
+        FROM documents AS d
+        INNER JOIN internships AS i
+          ON d.internship_id = i.id
+        INNER JOIN users AS student
+          ON i.student_id = student.id
+        WHERE i.mentor_id = ?
+        ORDER BY d.submitted_at DESC
+      `)
+      .all(mentorId);
+
+    res.json(documents);
+  } catch (error) {
+    console.error(
+      "Greška pri dohvaćanju dokumenata mentora:",
+      error
+    );
+
+    res.status(500).json({
+      error: "Nije moguće dohvatiti dokumente.",
+    });
+  }
+});
+
+app.get("/mentor/documents/:id/download", authenticateToken, (req, res) => {
+  try {
+    const mentorId = req.user.userId;
+    const documentId = Number(req.params.id);
+
+    if (req.user.role !== "mentor") {
+      return res.status(403).json({
+        error: "Pristup je dopušten samo mentorima.",
+      });
+    }
+
+    if (!Number.isInteger(documentId)) {
+      return res.status(400).json({
+        error: "ID dokumenta nije ispravan.",
+      });
+    }
+
+    const document = db
+      .prepare(`
+        SELECT
+          d.file_path,
+          d.file_name
+        FROM documents AS d
+        INNER JOIN internships AS i
+          ON d.internship_id = i.id
+        WHERE d.id = ?
+          AND i.mentor_id = ?
+      `)
+      .get(documentId, mentorId);
+
+    if (!document) {
+      return res.status(404).json({
+        error: "Dokument nije pronađen.",
+      });
+    }
+
+    if (!document.file_path || !fs.existsSync(document.file_path)) {
+      return res.status(404).json({
+        error: "Datoteka dokumenta nije pronađena.",
+      });
+    }
+
+    res.download(
+      document.file_path,
+      document.file_name || "dokument.docx"
+    );
+  } catch (error) {
+    console.error("Greška pri preuzimanju dokumenta:", error);
+
+    res.status(500).json({
+      error: "Dokument nije moguće preuzeti.",
+    });
+  }
+});
+
+app.patch("/mentor/documents/:id/approve", authenticateToken, (req, res) => {
+  try {
+    const mentorId = req.user.userId;
+    const documentId = Number(req.params.id);
+
+    if (req.user.role !== "mentor") {
+      return res.status(403).json({
+        error: "Pristup je dopušten samo mentorima.",
+      });
+    }
+
+    if (!Number.isInteger(documentId)) {
+      return res.status(400).json({
+        error: "ID dokumenta nije ispravan.",
+      });
+    }
+
+    const document = db
+      .prepare(`
+        SELECT d.id
+        FROM documents AS d
+        INNER JOIN internships AS i
+          ON d.internship_id = i.id
+        WHERE d.id = ?
+          AND i.mentor_id = ?
+      `)
+      .get(documentId, mentorId);
+
+    if (!document) {
+      return res.status(404).json({
+        error: "Dokument nije pronađen.",
+      });
+    }
+
+    db.prepare(`
+      UPDATE documents
+      SET
+        status = 'approved',
+        approved_at = CURRENT_TIMESTAMP,
+        approved_by = ?,
+        mentor_comment = NULL,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(mentorId, documentId);
+
+    const updatedDocument = db
+      .prepare(`
+        SELECT
+          id,
+          status,
+          version_number,
+          file_name,
+          submitted_at,
+          mentor_comment,
+          approved_at
+        FROM documents
+        WHERE id = ?
+      `)
+      .get(documentId);
+
+    res.json(updatedDocument);
+  } catch (error) {
+    console.error("Greška pri odobravanju dokumenta:", error);
+
+    res.status(500).json({
+      error: "Dokument nije moguće odobriti.",
+    });
+  }
+});
+
+app.patch("/mentor/documents/:id/reject", authenticateToken, (req, res) => {
+  try {
+    const mentorId = req.user.userId;
+    const documentId = Number(req.params.id);
+    const { comment } = req.body;
+
+    if (req.user.role !== "mentor") {
+      return res.status(403).json({
+        error: "Pristup je dopušten samo mentorima.",
+      });
+    }
+
+    if (!Number.isInteger(documentId)) {
+      return res.status(400).json({
+        error: "ID dokumenta nije ispravan.",
+      });
+    }
+
+    if (!comment?.trim()) {
+      return res.status(400).json({
+        error: "Komentar je obavezan kod odbijanja dokumenta.",
+      });
+    }
+
+    const document = db
+      .prepare(`
+        SELECT d.id
+        FROM documents AS d
+        INNER JOIN internships AS i
+          ON d.internship_id = i.id
+        WHERE d.id = ?
+          AND i.mentor_id = ?
+      `)
+      .get(documentId, mentorId);
+
+    if (!document) {
+      return res.status(404).json({
+        error: "Dokument nije pronađen.",
+      });
+    }
+
+    db.prepare(`
+      UPDATE documents
+      SET
+        status = 'rejected',
+        approved_at = NULL,
+        approved_by = NULL,
+        mentor_comment = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(comment.trim(), documentId);
+
+    const updatedDocument = db
+      .prepare(`
+        SELECT
+          id,
+          status,
+          version_number,
+          file_name,
+          submitted_at,
+          mentor_comment
+        FROM documents
+        WHERE id = ?
+      `)
+      .get(documentId);
+
+    res.json(updatedDocument);
+  } catch (error) {
+    console.error("Greška pri odbijanju dokumenta:", error);
+
+    res.status(500).json({
+      error: "Dokument nije moguće odbiti.",
     });
   }
 });

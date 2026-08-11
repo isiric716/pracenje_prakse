@@ -1,5 +1,5 @@
 import "./App.css";
-import { BrowserRouter, Routes, Route, NavLink, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
@@ -8,7 +8,7 @@ import MentorDashboard from "./pages/MentorDashboard";
 import Export from "./pages/Export";
 
 
-const NAV_ITEMS = [
+const STUDENT_NAV_ITEMS = [
   {
     to: "/dashboard",
     label: "Dashboard",
@@ -56,6 +56,21 @@ const NAV_ITEMS = [
   },
 ];
 
+const MENTOR_NAV_ITEMS = [
+  {
+    to: "/mentor",
+    label: "Mentor dashboard",
+    icon: (
+      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </svg>
+    ),
+  },
+];
+
 function AppLayout({ children, user }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -63,6 +78,10 @@ function AppLayout({ children, user }) {
   const displayName = user?.fullName || "";
   const displayRole = user?.role === "mentor" ? "Mentor" : "Student";
   const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+  const navItems =
+  user?.role === "mentor"
+    ? MENTOR_NAV_ITEMS
+    : STUDENT_NAV_ITEMS;
 
   return (
     <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
@@ -83,7 +102,7 @@ function AppLayout({ children, user }) {
         </div>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -149,33 +168,105 @@ function AppLayout({ children, user }) {
   );
 }
 
+function ProtectedRoute({ user, allowedRole, children }) {
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (user.role !== allowedRole) {
+    return (
+      <Navigate
+        to={user.role === "mentor" ? "/mentor" : "/dashboard"}
+        replace
+      />
+    );
+  }
+
+  return children;
+}
+
 function AppRoutes() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    fetch("http://localhost:3001/users/current")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Nije moguće dohvatiti korisnika.");
-        }
+  const token = localStorage.getItem("token");
 
-        return response.json();
-      })
-      .then((data) => {
-        setUser(data);
-      });
-  }, []);
+  if (!token) {
+    return;
+  }
 
+  fetch("http://localhost:3001/users/current", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Nije moguće dohvatiti korisnika.");
+      }
+
+      return response.json();
+    })
+    .then((data) => {
+      setUser(data);
+    })
+    .catch(() => {
+      localStorage.removeItem("token");
+      setUser(null);
+    });
+}, []);
   return (
     <Routes>
-      <Route path="/" element={<LandingPage onLogin={setUser} />} />
-      <Route path="/dashboard" element={<AppLayout user={user}><Dashboard user={user} /></AppLayout>} />
-      <Route path="/diary" element={<AppLayout user={user}><Diary user={user} /></AppLayout>} />
-      <Route path="/mentor" element={<AppLayout user={user}><MentorDashboard user={user} /></AppLayout>} />
-      <Route path="/export" element={<AppLayout user={user}><Export user={user} /></AppLayout>} />
+      <Route
+        path="/"
+        element={<LandingPage onLogin={setUser} />}
+      />
+      <Route
+      path="/dashboard"
+      element={
+        <ProtectedRoute user={user} allowedRole="student">
+          <AppLayout user={user}>
+            <Dashboard user={user} />
+          </AppLayout>
+        </ProtectedRoute>
+      }
+    />
+
+    <Route
+      path="/diary"
+      element={
+        <ProtectedRoute user={user} allowedRole="student">
+          <AppLayout user={user}>
+            <Diary user={user} />
+          </AppLayout>
+        </ProtectedRoute>
+      }
+    />
+
+    <Route
+      path="/export"
+      element={
+        <ProtectedRoute user={user} allowedRole="student">
+          <AppLayout user={user}>
+            <Export user={user} />
+          </AppLayout>
+        </ProtectedRoute>
+      }
+    />
+
+    <Route
+      path="/mentor"
+      element={
+        <ProtectedRoute user={user} allowedRole="mentor">
+          <AppLayout user={user}>
+            <MentorDashboard user={user} />
+          </AppLayout>
+        </ProtectedRoute>
+      }
+    />
     </Routes>
-  );
-}
+    );
+  }
 
 function App() {
   return (
