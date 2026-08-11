@@ -135,14 +135,13 @@ function Diary({ user }) {
                 <th>Datum</th>
                 <th>Sati</th>
                 <th>Opis aktivnosti</th>
-                <th>Status</th>
                 <th>Akcije</th>
               </tr>
             </thead>
             <tbody>
               {sortedEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: "center", color: "var(--text-muted)", padding: "32px" }}>
+                  <td colSpan="4" style={{ textAlign: "center", color: "var(--text-muted)", padding: "32px" }}>
                     Nema unosa. Dodaj prvi zapis!
                   </td>
                 </tr>
@@ -153,36 +152,43 @@ function Diary({ user }) {
                     <td>{e.hours} h</td>
                     <td>{e.description}</td>
                     <td>
-                      <span
-                        className="status-badge"
-                        style={{
-                          color: e.status === "approved" ? "#10b981" : "#3b82f6",
-                        }}
-                      >
-                        {e.status === "approved" ? "Završeno" : "U tijeku"}
-                      </span>
-                    </td>
-                    <td>
-                      {e.status === "pending" ? (
-                        <div className="diary-actions">
-                          <button className="action-btn edit-btn" onClick={() => handleEdit(e)}>
-                            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                          </button>
-                          <button className="action-btn delete-btn" onClick={() => handleDelete(e.id)}>
-                            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                              <path d="M10 11v6M14 11v6" />
-                              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                            </svg>
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ color: "var(--text-muted)", fontSize: "13px" }}>Zaključano</span>
-                      )}
+                      <div className="diary-actions">
+                        <button
+                          className="action-btn edit-btn"
+                          onClick={() => handleEdit(e)}
+                        >
+                          <svg
+                            width="15"
+                            height="15"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                        </button>
+
+                        <button
+                          className="action-btn delete-btn"
+                          onClick={() => handleDelete(e.id)}
+                        >
+                          <svg
+                            width="15"
+                            height="15"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                          >
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                            <path d="M10 11v6M14 11v6" />
+                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -270,21 +276,28 @@ function Diary({ user }) {
 function EntryModal({ onClose, onSave, editingEntry }) {
   const [form, setForm] = useState({
     entry_date: editingEntry?.entry_date || "",
+    activity_type: editingEntry?.activity_type || "development",
     hours: editingEntry?.hours || "",
     description: editingEntry?.description || "",
-  });
+  });   
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = () => {
-    if (!form.entry_date || !form.hours || !form.description) {
-      alert("Popuni sva polja!");
-      return;
-    }
-    onSave(form);
-  };
+  if (
+    !form.entry_date ||
+    !form.activity_type ||
+    !form.hours ||
+    !form.description
+  ) {
+    alert("Popuni sva polja!");
+    return;
+  }
+
+  onSave(form);
+};
 
   return (
     <div className="modal-overlay">
@@ -299,6 +312,19 @@ function EntryModal({ onClose, onSave, editingEntry }) {
             <label>Datum</label>
             <input type="date" name="entry_date" value={form.entry_date} onChange={handleChange} />
           </div>
+        <div className="doc-field">
+          <label>Vrsta aktivnosti</label>
+          <select
+            name="activity_type"
+            value={form.activity_type}
+            onChange={handleChange}
+          >
+            <option value="development">Razvoj</option>
+            <option value="testing">Testiranje</option>
+            <option value="documentation">Dokumentacija</option>
+            <option value="other">Ostalo</option>
+          </select>
+        </div>
           <div className="doc-field">
             <label>Broj sati</label>
             <input type="number" name="hours" placeholder="4" value={form.hours} onChange={handleChange} />

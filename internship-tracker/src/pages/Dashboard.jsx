@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function Dashboard({ user }) {
+  const token = localStorage.getItem("token");
   const [entries, setEntries] = useState([]);
   const [internship, setInternship] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -9,8 +10,17 @@ function Dashboard({ user }) {
 
  useEffect(() => {
   Promise.all([
-    fetch("http://localhost:3001/entries"),
-    fetch("http://localhost:3001/internships/active"),
+    fetch("http://localhost:3001/entries", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+
+    fetch("http://localhost:3001/internships/active", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
   ])
     .then(async ([entriesResponse, internshipResponse]) => {
       if (!entriesResponse.ok) {
@@ -26,23 +36,31 @@ function Dashboard({ user }) {
 
       setEntries(entriesData);
       setInternship(internshipData);
-      setLoading(false);
     })
     .catch((error) => {
       console.error("Greška pri učitavanju Dashboarda:", error);
-      throw error;
+    })
+    .finally(() => {
+      setLoading(false);
     });
-   },
-  []);
-  
-  if (loading) {
-    return (
-      <div style={{ color: "var(--text-secondary)", padding: "40px" }}>
-        Učitavanje...
-      </div>
-    );
-  }
+    },
+    [token]); 
 
+if (loading) {
+  return (
+    <div style={{ color: "var(--text-secondary)", padding: "40px" }}>
+      Učitavanje...
+    </div>
+  );
+}
+
+if (!internship) {
+  return (
+    <div style={{ color: "var(--text-secondary)", padding: "40px" }}>
+      Aktivna praksa nije pronađena.
+    </div>
+  );
+}
 
  const totalHours = internship.required_hours;
 

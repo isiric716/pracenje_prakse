@@ -253,8 +253,7 @@ app.get("/entries", authenticateToken, (req, res) => {
           e.id,
           e.internship_id,
           e.entry_date,
-          e.mentor_comment,
-          e.status,
+          e.activity_type,
           e.hours,
           e.description
         FROM entries AS e
@@ -279,11 +278,11 @@ app.post("/entries", authenticateToken, (req, res) => {
   try {
     const studentId = req.user.userId;
 
-    const { entry_date, hours, description } = req.body;
+    const { entry_date, activity_type, hours, description } = req.body;
 
-    if (!entry_date || !hours || !description) {
+    if (!entry_date || !activity_type || !hours || !description) {
       return res.status(400).json({
-        error: "Datum, broj sati i opis su obavezni.",
+        error: "Datum, tip aktivnosti, broj sati i opis su obavezni.",
       });
     }
 
@@ -307,14 +306,16 @@ app.post("/entries", authenticateToken, (req, res) => {
         INSERT INTO entries (
           internship_id,
           entry_date,
+          activity_type,
           hours,
           description
         )
-        VALUES (?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
       `)
       .run(
         activeInternship.id,
         entry_date,
+        activity_type,
         hours,
         description
       );
@@ -325,10 +326,9 @@ app.post("/entries", authenticateToken, (req, res) => {
           id,
           internship_id,
           entry_date,
+          activity_type,
           hours,
-          description,
-          status,
-          mentor_comment
+          description
         FROM entries
         WHERE id = ?
       `)
@@ -349,7 +349,7 @@ app.put("/entries/:id", authenticateToken, (req, res) => {
     const studentId = req.user.userId;
     const entryId = Number(req.params.id);
 
-    const { entry_date, hours, description } = req.body;
+    const { entry_date, activity_type, hours, description } = req.body;
 
     if (!Number.isInteger(entryId)) {
       return res.status(400).json({
@@ -357,17 +357,16 @@ app.put("/entries/:id", authenticateToken, (req, res) => {
       });
     }
 
-    if (!entry_date || !hours || !description) {
+    if (!entry_date || !activity_type || !hours || !description) {
       return res.status(400).json({
-        error: "Datum, broj sati i opis su obavezni.",
+        error: "Datum, vrsta aktivnosti, broj sati i opis su obavezni.",
       });
     }
 
     const existingEntry = db
       .prepare(`
         SELECT
-          e.id,
-          e.status
+          e.id
         FROM entries AS e
         INNER JOIN internships AS i
           ON e.internship_id = i.id
@@ -382,22 +381,18 @@ app.put("/entries/:id", authenticateToken, (req, res) => {
       });
     }
 
-    if (existingEntry.status !== "pending") {
-      return res.status(409).json({
-        error: "Zaključani zapis nije moguće uređivati.",
-      });
-    }
-
     db.prepare(`
       UPDATE entries
       SET
         entry_date = ?,
+        activity_type = ?,
         hours = ?,
         description = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
       entry_date,
+      activity_type,
       hours,
       description,
       entryId
@@ -409,10 +404,9 @@ app.put("/entries/:id", authenticateToken, (req, res) => {
           id,
           internship_id,
           entry_date,
+          activity_type,
           hours,
-          description,
-          status,
-          mentor_comment
+          description
         FROM entries
         WHERE id = ?
       `)
@@ -442,8 +436,7 @@ app.delete("/entries/:id", authenticateToken, (req, res) => {
     const existingEntry = db
       .prepare(`
         SELECT
-          e.id,
-          e.status
+          e.id
         FROM entries AS e
         INNER JOIN internships AS i
           ON e.internship_id = i.id
@@ -458,11 +451,6 @@ app.delete("/entries/:id", authenticateToken, (req, res) => {
       });
     }
 
-    if (existingEntry.status !== "pending") {
-      return res.status(409).json({
-        error: "Zaključani zapis nije moguće obrisati.",
-      });
-    }
 
     db.prepare(`
       DELETE FROM entries
