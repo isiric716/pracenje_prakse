@@ -318,6 +318,227 @@
 
 .settings-actions button:disabled { opacity: .6; cursor: wait; }
 
+/* === MENTOR DASHBOARD === */
+
+.mentor-dashboard {
+  display: grid;
+  gap: 24px;
+}
+
+.mentor-heading h1 {
+  margin: 4px 0 8px;
+  color: var(--text-primary);
+  font-size: 30px;
+}
+
+.mentor-heading > p:last-child,
+.mentor-panel-heading p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.mentor-eyebrow {
+  margin: 0;
+  color: var(--accent-light);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.mentor-panel {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.mentor-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mentor-panel-heading h2 {
+  margin: 0 0 5px;
+  font-size: 17px;
+}
+
+.mentor-panel-heading p {
+  font-size: 12px;
+}
+
+.mentor-table-wrap {
+  overflow-x: auto;
+}
+
+.mentor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.mentor-table th {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mentor-table td {
+  min-width: 120px;
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.mentor-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.mentor-table td strong,
+.mentor-table td > span {
+  display: block;
+}
+
+.mentor-table td strong {
+  margin-bottom: 4px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.mentor-table td > span:not(.mentor-status) {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.mentor-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 7px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.mentor-progress-track {
+  width: 150px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--bg-elevated);
+}
+
+.mentor-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-light);
+}
+
+.mentor-status {
+  width: max-content;
+  padding: 5px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mentor-status--active,
+.mentor-status--approved {
+  background: rgba(34, 197, 94, .12);
+  color: #86efac;
+}
+
+.mentor-status--planned,
+.mentor-status--pending {
+  background: rgba(59, 130, 246, .12);
+  color: #93c5fd;
+}
+
+.mentor-status--completed {
+  background: rgba(168, 85, 247, .12);
+  color: #d8b4fe;
+}
+
+.mentor-status--cancelled,
+.mentor-status--rejected {
+  background: rgba(239, 68, 68, .12);
+  color: #fca5a5;
+}
+
+.mentor-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.mentor-actions button {
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mentor-actions button:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.mentor-actions .mentor-approve {
+  border-color: rgba(34, 197, 94, .35);
+  color: #86efac;
+}
+
+.mentor-actions .mentor-reject {
+  border-color: rgba(239, 68, 68, .35);
+  color: #fca5a5;
+}
+
+.mentor-actions button:disabled {
+  cursor: wait;
+  opacity: .5;
+}
+
+.mentor-empty {
+  padding: 44px 24px;
+  text-align: center;
+}
+
+.mentor-empty h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.mentor-empty p,
+.mentor-loading {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.mentor-error {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(239, 68, 68, .35);
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, .1);
+  color: #fca5a5;
+  font-size: 13px;
+}
+
 @media (max-width: 720px) {
   .settings-section { grid-template-columns: 1fr; gap: 20px; padding: 22px; }
 }

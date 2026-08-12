@@ -1196,7 +1196,7 @@ app.post("/documents/submit", authenticateToken, (req, res) => {
   }
 });
 
-app.get("/mentor/documents", authenticateToken, (req, res) => {
+app.get("/mentor/dashboard", authenticateToken, (req, res) => {
   try {
     const mentorId = req.user.userId;
 
@@ -1205,6 +1205,39 @@ app.get("/mentor/documents", authenticateToken, (req, res) => {
         error: "Pristup je dopušten samo mentorima.",
       });
     }
+
+    const students = db
+      .prepare(`
+        SELECT
+          student.id,
+          student.first_name || ' ' || student.last_name AS full_name,
+          student.email,
+          c.name AS company_name,
+          i.start_date,
+          i.end_date,
+          i.required_hours,
+          i.status,
+          COALESCE(SUM(e.hours), 0) AS completed_hours
+        FROM internships AS i
+        INNER JOIN users AS student
+          ON i.student_id = student.id
+        INNER JOIN companies AS c
+          ON i.company_id = c.id
+        LEFT JOIN entries AS e
+          ON e.internship_id = i.id
+        WHERE i.mentor_id = ?
+        GROUP BY i.id
+        ORDER BY
+          CASE i.status
+            WHEN 'active' THEN 1
+            WHEN 'planned' THEN 2
+            WHEN 'completed' THEN 3
+            ELSE 4
+          END,
+          student.first_name,
+          student.last_name
+      `)
+      .all(mentorId);
 
     const documents = db
       .prepare(`
@@ -1224,11 +1257,12 @@ app.get("/mentor/documents", authenticateToken, (req, res) => {
         INNER JOIN users AS student
           ON i.student_id = student.id
         WHERE i.mentor_id = ?
+          AND d.status <> 'draft'
         ORDER BY d.submitted_at DESC
       `)
       .all(mentorId);
 
-    res.json(documents);
+    res.json({ students, documents });
   } catch (error) {
     console.error(
       "Greška pri dohvaćanju dokumenata mentora:",
@@ -1330,7 +1364,7 @@ app.patch("/mentor/documents/:id/approve", authenticateToken, (req, res) => {
       });
     }
 
-    db.prepare(`
+    const result = db.prepare(`
       UPDATE documents
       SET
         status = 'approved',
@@ -1339,7 +1373,14 @@ app.patch("/mentor/documents/:id/approve", authenticateToken, (req, res) => {
         mentor_comment = NULL,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
+        AND status = 'pending'
     `).run(mentorId, documentId);
+
+    if (result.changes !== 1) {
+      return res.status(409).json({
+        error: "Dokument je već obrađen drugim zahtjevom.",
+      });
+    }
 
     const updatedDocument = db
       .prepare(`
@@ -1407,7 +1448,7 @@ app.patch("/mentor/documents/:id/reject", authenticateToken, (req, res) => {
       });
     }
 
-    db.prepare(`
+    const result = db.prepare(`
       UPDATE documents
       SET
         status = 'rejected',
@@ -1416,7 +1457,14 @@ app.patch("/mentor/documents/:id/reject", authenticateToken, (req, res) => {
         mentor_comment = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
+        AND status = 'pending'
     `).run(comment.trim(), documentId);
+
+    if (result.changes !== 1) {
+      return res.status(409).json({
+        error: "Dokument je već obrađen drugim zahtjevom.",
+      });
+    }
 
     const updatedDocument = db
       .prepare(`
