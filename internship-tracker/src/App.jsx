@@ -1,6 +1,6 @@
 import "./App.css";
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Diary from "./pages/Diary";
@@ -71,7 +71,7 @@ const MENTOR_NAV_ITEMS = [
   },
 ];
 
-function AppLayout({ children, user }) {
+function AppLayout({ children, user, onLogout }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -160,6 +160,14 @@ function AppLayout({ children, user }) {
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </div>
+            <button className="topbar-logout-btn" type="button" onClick={onLogout}>
+              <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 17l5-5-5-5" />
+                <path d="M15 12H3" />
+                <path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" />
+              </svg>
+              Odjava
+            </button>
           </div>
         </header>
         <main className="app-content">{children}</main>
@@ -168,7 +176,11 @@ function AppLayout({ children, user }) {
   );
 }
 
-function ProtectedRoute({ user, allowedRole, children }) {
+function ProtectedRoute({ user, isAuthReady, allowedRole, children }) {
+  if (!isAuthReady) {
+    return null;
+  }
+
   if (!user) {
     return <Navigate to="/" replace />;
   }
@@ -187,6 +199,11 @@ function ProtectedRoute({ user, allowedRole, children }) {
 
 function AppRoutes() {
   const [user, setUser] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(
+    () => !localStorage.getItem("token")
+  );
+  const authRequestRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
   const token = localStorage.getItem("token");
@@ -195,10 +212,14 @@ function AppRoutes() {
     return;
   }
 
+  const controller = new AbortController();
+  authRequestRef.current = controller;
+
   fetch("http://localhost:3001/users/current", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    signal: controller.signal,
   })
     .then((response) => {
       if (!response.ok) {
@@ -207,25 +228,47 @@ function AppRoutes() {
 
       return response.json();
     })
-    .then((data) => {
-      setUser(data);
+    .then(setUser)
+    .catch((error) => {
+      if (error.name !== "AbortError") {
+        localStorage.removeItem("token");
+        setUser(null);
+      }
     })
-    .catch(() => {
-      localStorage.removeItem("token");
-      setUser(null);
+    .finally(() => {
+      if (!controller.signal.aborted) {
+        setIsAuthReady(true);
+      }
     });
+
+  return () => controller.abort();
 }, []);
+
+  function handleLogin(authenticatedUser) {
+    authRequestRef.current?.abort();
+    setUser(authenticatedUser);
+    setIsAuthReady(true);
+  }
+
+  function handleLogout() {
+    authRequestRef.current?.abort();
+    localStorage.removeItem("token");
+    setUser(null);
+    setIsAuthReady(true);
+    navigate("/", { replace: true });
+  }
+
   return (
     <Routes>
       <Route
         path="/"
-        element={<LandingPage onLogin={setUser} />}
+        element={<LandingPage onLogin={handleLogin} />}
       />
       <Route
       path="/dashboard"
       element={
-        <ProtectedRoute user={user} allowedRole="student">
-          <AppLayout user={user}>
+        <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="student">
+          <AppLayout user={user} onLogout={handleLogout}>
             <Dashboard user={user} />
           </AppLayout>
         </ProtectedRoute>
@@ -235,8 +278,8 @@ function AppRoutes() {
     <Route
       path="/diary"
       element={
-        <ProtectedRoute user={user} allowedRole="student">
-          <AppLayout user={user}>
+        <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="student">
+          <AppLayout user={user} onLogout={handleLogout}>
             <Diary user={user} />
           </AppLayout>
         </ProtectedRoute>
@@ -246,8 +289,8 @@ function AppRoutes() {
     <Route
       path="/export"
       element={
-        <ProtectedRoute user={user} allowedRole="student">
-          <AppLayout user={user}>
+        <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="student">
+          <AppLayout user={user} onLogout={handleLogout}>
             <Export user={user} />
           </AppLayout>
         </ProtectedRoute>
@@ -257,8 +300,8 @@ function AppRoutes() {
     <Route
       path="/mentor"
       element={
-        <ProtectedRoute user={user} allowedRole="mentor">
-          <AppLayout user={user}>
+        <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="mentor">
+          <AppLayout user={user} onLogout={handleLogout}>
             <MentorDashboard user={user} />
           </AppLayout>
         </ProtectedRoute>

@@ -48,15 +48,293 @@ function authenticateToken(req, res, next) {
 app.use(cors());
 app.use(express.json());
 
+function createAuthResponse(user) {
+  const token = jwt.sign(
+    {
+      userId: user.id,
+      role: user.role,
+    },
+    jwtSecret,
+    {
+      expiresIn: "8h",
+    }
+  );
+
+  return {
+    token,
+    user: {
+      id: user.id,
+      fullName: `${user.first_name} ${user.last_name}`,
+      email: user.email,
+      role: user.role,
+    },
+  };
+}
+
+app.get("/registration-options", (req, res) => {
+  try {
+    const faculties = db
+      .prepare(`
+        SELECT id, name, city
+        FROM faculties
+        ORDER BY name
+      `)
+      .all();
+
+    const companies = db
+      .prepare(`
+        SELECT id, name, city
+        FROM companies
+        WHERE is_active = 1
+        ORDER BY name
+      `)
+      .all();
+
+    const mentors = db
+      .prepare(`
+        SELECT
+          u.id,
+          u.first_name || ' ' || u.last_name AS full_name,
+          u.company_id,
+          c.name AS company_name
+        FROM users AS u
+        INNER JOIN companies AS c
+          ON u.company_id = c.id
+        WHERE u.role = 'mentor'
+          AND u.is_active = 1
+          AND c.is_active = 1
+        ORDER BY u.first_name, u.last_name
+      `)
+      .all();
+
+    res.json({ faculties, companies, mentors });
+  } catch (error) {
+    console.error("Greška pri dohvaćanju podataka za registraciju:", error);
+    res.status(500).json({
+      error: "Nije moguće dohvatiti podatke za registraciju.",
+    });
+  }
+});
+
+app.post("/register", async (req, res) => {
+  const {
+    fullName,
+    email,
+    password,
+    role,
+    facultyId,
+    companyId,
+    mentorId,
+    requiredHours,
+    startDate,
+    endDate,
+  } = req.body;
+
+  const normalizedName = typeof fullName === "string"
+    ? fullName.trim().replace(/\s+/g, " ")
+    : "";
+  const nameParts = normalizedName.split(" ").filter(Boolean);
+  const normalizedEmail = typeof email === "string"
+    ? email.trim().toLowerCase()
+    : "";
+
+  if (nameParts.length < 2) {
+    return res.status(400).json({
+      error: "Unesite ime i prezime.",
+    });
+  }
+
+  if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+    return res.status(400).json({
+      error: "Unesite ispravnu email adresu.",
+    });
+  }
+
+  if (typeof password !== "string" || password.length < 8) {
+    return res.status(400).json({
+      error: "Lozinka mora imati najmanje 8 znakova.",
+    });
+  }
+
+  if (!["student", "mentor"].includes(role)) {
+    return res.status(400).json({
+      error: "Odaberite ispravnu ulogu.",
+    });
+  }
+
+  const parsedFacultyId = Number(facultyId);
+  const parsedCompanyId = Number(companyId);
+  const parsedMentorId = Number(mentorId);
+  const parsedHours = Number(requiredHours);
+
+  if (role === "student") {
+    if (
+      !Number.isInteger(parsedFacultyId) ||
+      !Number.isInteger(parsedMentorId) ||
+      !Number.isFinite(parsedHours) ||
+      parsedHours <= 0 ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(startDate || "") ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(endDate || "") ||
+      endDate < startDate
+    ) {
+      return res.status(400).json({
+        error: "Ispunite sve podatke o stručnoj praksi ispravnim vrijednostima.",
+      });
+    }
+  }
+
+  if (role === "mentor" && !Number.isInteger(parsedCompanyId)) {
+    return res.status(400).json({
+      error: "Odaberite kompaniju.",
+    });
+  }
+
+  try {
+    const existingUser = db
+      .prepare("SELECT id FROM users WHERE LOWER(email) = ?")
+      .get(normalizedEmail);
+
+    if (existingUser) {
+      return res.status(409).json({
+        error: "Korisnik s tom email adresom već postoji.",
+      });
+    }
+
+    let mentor;
+
+    if (role === "student") {
+      const faculty = db
+        .prepare("SELECT id FROM faculties WHERE id = ?")
+        .get(parsedFacultyId);
+
+      mentor = db
+        .prepare(`
+          SELECT id, company_id
+          FROM users
+          WHERE id = ?
+            AND role = 'mentor'
+            AND is_active = 1
+        `)
+        .get(parsedMentorId);
+
+      if (!faculty || !mentor?.company_id) {
+        return res.status(400).json({
+          error: "Odabrani fakultet ili mentor nije dostupan.",
+        });
+      }
+    } else {
+      const company = db
+        .prepare("SELECT id FROM companies WHERE id = ? AND is_active = 1")
+        .get(parsedCompanyId);
+
+      if (!company) {
+        return res.status(400).json({
+          error: "Odabrana kompanija nije dostupna.",
+        });
+      }
+    }
+
+    const firstName = nameParts.shift();
+    const lastName = nameParts.join(" ");
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    db.exec("BEGIN IMMEDIATE");
+
+    const userResult = db
+      .prepare(`
+        INSERT INTO users (
+          faculty_id,
+          company_id,
+          first_name,
+          last_name,
+          email,
+          password_hash,
+          role
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `)
+      .run(
+        role === "student" ? parsedFacultyId : null,
+        role === "mentor" ? parsedCompanyId : null,
+        firstName,
+        lastName,
+        normalizedEmail,
+        passwordHash,
+        role
+      );
+
+    const userId = Number(userResult.lastInsertRowid);
+
+    if (role === "student") {
+      db.prepare(`
+        INSERT INTO internships (
+          student_id,
+          mentor_id,
+          company_id,
+          start_date,
+          end_date,
+          required_hours,
+          status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, 'active')
+      `).run(
+        userId,
+        parsedMentorId,
+        mentor.company_id,
+        startDate,
+        endDate,
+        parsedHours
+      );
+    }
+
+    db.exec("COMMIT");
+
+    const newUser = db
+      .prepare(`
+        SELECT id, first_name, last_name, email, role
+        FROM users
+        WHERE id = ?
+      `)
+      .get(userId);
+
+    res.status(201).json(createAuthResponse(newUser));
+  } catch (error) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // Transakcija nije bila pokrenuta ili je već završena.
+    }
+
+    console.error("Greška pri registraciji:", error);
+
+    if (String(error.message).includes("UNIQUE constraint failed: users.email")) {
+      return res.status(409).json({
+        error: "Korisnik s tom email adresom već postoji.",
+      });
+    }
+
+    res.status(500).json({
+      error: "Registracija nije uspjela.",
+    });
+  }
+});
+
 app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    if (
+      typeof email !== "string" ||
+      !email.trim() ||
+      typeof password !== "string" ||
+      !password
+    ) {
       return res.status(400).json({
         error: "Email i lozinka su obavezni.",
       });
     }
+
+    const normalizedEmail = email.trim().toLowerCase();
 
     const user = db
       .prepare(`
@@ -69,9 +347,9 @@ app.post("/login", async (req, res) => {
           role,
           is_active
         FROM users
-        WHERE email = ?
+        WHERE LOWER(email) = ?
       `)
-      .get(email);
+      .get(normalizedEmail);
 
     if (!user) {
       return res.status(401).json({
@@ -96,26 +374,7 @@ app.post("/login", async (req, res) => {
       });
     }
 
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        role: user.role,
-      },
-      jwtSecret,
-      {
-        expiresIn: "8h",
-      }
-    );
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        fullName: `${user.first_name} ${user.last_name}`,
-        email: user.email,
-        role: user.role,
-      },
-    });
+    res.json(createAuthResponse(user));
       } catch (error) {
         console.error("Greška pri prijavi:", error);
 

@@ -27,6 +27,7 @@ function LandingPage({ onLogin }) {
 
       {authMode && (
         <Auth
+          key={authMode}
           mode={authMode}
           onClose={closeModal}
           onSwitchMode={setAuthMode}
