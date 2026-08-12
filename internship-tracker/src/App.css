@@ -211,20 +211,6 @@
 
 .topbar-right { display: flex; align-items: center; gap: 12px; }
 
-.topbar-icon-btn {
-  position: relative; background: transparent; border: none;
-  color: var(--text-secondary); cursor: pointer; padding: 8px;
-  border-radius: var(--radius-sm); display: flex; align-items: center;
-  transition: background var(--transition), color var(--transition);
-}
-.topbar-icon-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
-
-.topbar-badge {
-  position: absolute; top: 6px; right: 6px;
-  width: 7px; height: 7px; background: #ef4444;
-  border-radius: 50%; border: 1.5px solid var(--bg-surface);
-}
-
 .topbar-profile {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 12px; border-radius: var(--radius-sm);
