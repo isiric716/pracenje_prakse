@@ -16,13 +16,13 @@ const documentStatuses = {
 };
 
 function formatDate(value) {
-  return value.slice(0, 10).split("-").reverse().join(".");
+  return value ? value.slice(0, 10).split("-").reverse().join(".") : "Nije određeno";
 }
 
 function MentorDashboard() {
-  const [dashboard, setDashboard] = useState({ students: [], documents: [] });
+  const [dashboard, setDashboard] = useState({ invitations: [], students: [], documents: [] });
   const [isLoading, setIsLoading] = useState(true);
-  const [actionDocumentId, setActionDocumentId] = useState(null);
+  const [actionId, setActionId] = useState(null);
   const [error, setError] = useState("");
   const decisionRef = useRef(false);
 
@@ -87,7 +87,7 @@ function MentorDashboard() {
     if (decision === "reject" && !comment?.trim()) return;
 
     decisionRef.current = true;
-    setActionDocumentId(documentId);
+    setActionId(documentId);
     setError("");
 
     try {
@@ -118,7 +118,51 @@ function MentorDashboard() {
       setError(decisionError.message);
     } finally {
       decisionRef.current = false;
-      setActionDocumentId(null);
+      setActionId(null);
+    }
+  }
+
+  async function handleInvitation(invitation, decision) {
+    if (decisionRef.current) return;
+
+    decisionRef.current = true;
+    setActionId(invitation.id);
+    setError("");
+
+    try {
+      const response = await fetch(`${API_URL}/mentor/invitations/${invitation.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({ decision }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+
+      setDashboard((current) => ({
+        ...current,
+        invitations: current.invitations.filter((item) => item.id !== invitation.id),
+        students: decision === "accept"
+          ? [{
+              id: invitation.student_id,
+              full_name: invitation.student_name,
+              email: invitation.student_email,
+              company_name: invitation.company_name,
+              start_date: invitation.start_date,
+              end_date: invitation.end_date,
+              required_hours: invitation.required_hours,
+              completed_hours: 0,
+              status: "active",
+            }, ...current.students]
+          : current.students,
+      }));
+    } catch (invitationError) {
+      setError(invitationError.message);
+    } finally {
+      decisionRef.current = false;
+      setActionId(null);
     }
   }
 
@@ -135,6 +179,56 @@ function MentorDashboard() {
       </div>
 
       {error && <p className="mentor-error" role="alert">{error}</p>}
+
+      <section className="mentor-panel" aria-labelledby="invitations-title">
+        <div className="mentor-panel-heading">
+          <div>
+            <h2 id="invitations-title">Pozivi za mentorstvo</h2>
+            <p>{dashboard.invitations.length} na čekanju</p>
+          </div>
+        </div>
+
+        {dashboard.invitations.length === 0 ? (
+          <div className="mentor-empty">
+            <h3>Nema novih poziva</h3>
+            <p>Novi pozivi studenata prikazat će se ovdje.</p>
+          </div>
+        ) : (
+          <div className="mentor-invitations">
+            {dashboard.invitations.map((invitation) => (
+              <article key={invitation.id}>
+                <div>
+                  <h3>{invitation.student_name}</h3>
+                  <p>{invitation.student_email}</p>
+                </div>
+                <div>
+                  <span>{invitation.company_name}, {invitation.company_city}</span>
+                  <span>{formatDate(invitation.start_date)} – {formatDate(invitation.end_date)}</span>
+                  <span>{invitation.required_hours} h</span>
+                </div>
+                <div className="mentor-actions">
+                  <button
+                    className="mentor-reject"
+                    type="button"
+                    disabled={actionId !== null}
+                    onClick={() => handleInvitation(invitation, "reject")}
+                  >
+                    Odbij
+                  </button>
+                  <button
+                    className="mentor-approve"
+                    type="button"
+                    disabled={actionId !== null}
+                    onClick={() => handleInvitation(invitation, "accept")}
+                  >
+                    Prihvati
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="mentor-panel" aria-labelledby="students-title">
         <div className="mentor-panel-heading">
@@ -250,7 +344,7 @@ function MentorDashboard() {
                             <button
                               className="mentor-approve"
                               type="button"
-                              disabled={actionDocumentId !== null}
+                              disabled={actionId !== null}
                               onClick={() => handleDecision(documentItem.id, "approve")}
                             >
                               Odobri
@@ -258,7 +352,7 @@ function MentorDashboard() {
                             <button
                               className="mentor-reject"
                               type="button"
-                              disabled={actionDocumentId !== null}
+                              disabled={actionId !== null}
                               onClick={() => handleDecision(documentItem.id, "reject")}
                             >
                               Vrati

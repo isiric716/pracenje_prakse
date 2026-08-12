@@ -1,13 +1,5 @@
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE IF NOT EXISTS faculties (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    city TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-
 CREATE TABLE IF NOT EXISTS companies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -26,8 +18,7 @@ CREATE TABLE IF NOT EXISTS companies (
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    faculty_id INTEGER,
-    company_id INTEGER,
+    faculty_name TEXT,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
@@ -46,47 +37,18 @@ CREATE TABLE IF NOT EXISTS users (
         CHECK (is_active IN (0, 1)),
 
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (faculty_id)
-        REFERENCES faculties(id)
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-
-    FOREIGN KEY (company_id)
-        REFERENCES companies(id)
-        ON UPDATE CASCADE
-        ON DELETE SET NULL,
-
-    CHECK (
-        (
-            role = 'student'
-            AND faculty_id IS NOT NULL
-            AND company_id IS NULL
-        )
-        OR
-        (
-            role = 'mentor'
-            AND faculty_id IS NULL
-            AND company_id IS NOT NULL
-        )
-        OR
-        (
-            role = 'super_admin'
-            AND faculty_id IS NULL
-            AND company_id IS NULL
-        )
-    )
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS internships (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER NOT NULL,
     mentor_id INTEGER,
+    mentor_email TEXT,
     company_id INTEGER NOT NULL,
 
     start_date TEXT NOT NULL,
-    end_date TEXT NOT NULL,
+    end_date TEXT,
 
     required_hours REAL NOT NULL
         CHECK (required_hours > 0),
@@ -119,22 +81,17 @@ CREATE TABLE IF NOT EXISTS internships (
         ON UPDATE CASCADE
         ON DELETE RESTRICT,
 
-    CHECK (end_date >= start_date),
-
-    CHECK (
-        status IN ('planned', 'cancelled')
-        OR mentor_id IS NOT NULL
-    )
+    CHECK (end_date IS NULL OR end_date >= start_date)
 );
 
 
 /* Student može imati više praksi kroz vrijeme,
-   ali samo jednu aktivnu praksu. */
+   ali samo jednu praksu koja čeka potvrdu ili je aktivna. */
 
 CREATE UNIQUE INDEX IF NOT EXISTS
-    one_active_internship_per_student
+    one_current_internship_per_student
 ON internships(student_id)
-WHERE status = 'active';
+WHERE status IN ('planned', 'active');
 
 
 

@@ -99,12 +99,6 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
 .role-fieldset {
   margin: 0;
   padding: 0;
@@ -160,12 +154,6 @@
   font-size: 14px;
 }
 
-.auth-options-status {
-  margin: 0;
-  color: #64748b;
-  font-size: 14px;
-}
-
 .auth-switch {
   margin: 22px 0 0;
   color: #64748b;
@@ -191,7 +179,4 @@
     padding: 34px 20px 20px;
   }
 
-  .form-row {
-    grid-template-columns: 1fr;
-  }
 }

@@ -25,6 +25,7 @@ const STUDENT_NAV_ITEMS = [
   {
     to: "/diary",
     label: "Dnevnik",
+    requiresActiveInternship: true,
     icon: (
       <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -37,6 +38,7 @@ const STUDENT_NAV_ITEMS = [
   {
     to: "/export",
     label: "Izvoz",
+    requiresActiveInternship: true,
     icon: (
       <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -79,10 +81,11 @@ function AppLayout({ children, user, onLogout }) {
   const displayName = user?.fullName || "";
   const displayRole = user?.role === "mentor" ? "Mentor" : "Student";
   const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-  const navItems =
-  user?.role === "mentor"
+  const navItems = user?.role === "mentor"
     ? MENTOR_NAV_ITEMS
-    : STUDENT_NAV_ITEMS;
+    : STUDENT_NAV_ITEMS.filter(
+        (item) => !item.requiresActiveInternship || user?.internshipStatus === "active"
+      );
 
   return (
     <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
@@ -170,7 +173,7 @@ function AppLayout({ children, user, onLogout }) {
   );
 }
 
-function ProtectedRoute({ user, isAuthReady, allowedRole, children }) {
+function ProtectedRoute({ user, isAuthReady, allowedRole, requiresActiveInternship = false, children }) {
   if (!isAuthReady) {
     return null;
   }
@@ -186,6 +189,10 @@ function ProtectedRoute({ user, isAuthReady, allowedRole, children }) {
         replace
       />
     );
+  }
+
+  if (requiresActiveInternship && user.internshipStatus !== "active") {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -272,7 +279,7 @@ function AppRoutes() {
     <Route
       path="/diary"
       element={
-        <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="student">
+        <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="student" requiresActiveInternship>
           <AppLayout user={user} onLogout={handleLogout}>
             <Diary user={user} />
           </AppLayout>
@@ -283,7 +290,7 @@ function AppRoutes() {
     <Route
       path="/export"
       element={
-        <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="student">
+        <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="student" requiresActiveInternship>
           <AppLayout user={user} onLogout={handleLogout}>
             <Export user={user} />
           </AppLayout>

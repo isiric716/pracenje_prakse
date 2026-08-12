@@ -1,9 +1,3 @@
-INSERT OR IGNORE INTO faculties (id, name, city)
-VALUES
-    (1, 'FERIT', 'Osijek'),
-    (2, 'FOI', 'Varaždin'),
-    (3, 'FER', 'Zagreb');
-
 INSERT OR IGNORE INTO companies (
     id,
     name,
@@ -38,8 +32,7 @@ VALUES
 
 INSERT OR IGNORE INTO users (
     id,
-    faculty_id,
-    company_id,
+    faculty_name,
     first_name,
     last_name,
     email,
@@ -50,7 +43,6 @@ VALUES
     (
         1,
         NULL,
-        NULL,
         'Super',
         'Administrator',
         'admin@practice-app.hr',
@@ -59,8 +51,7 @@ VALUES
     ),
     (
         2,
-        1,
-        NULL,
+        'FERIT',
         'Ivona',
         'Student',
         'ivona@student.hr',
@@ -70,7 +61,6 @@ VALUES
     (
         3,
         NULL,
-        1,
         'Marko',
         'Mentor',
         'marko@be-terna.com',
@@ -82,6 +72,7 @@ INSERT OR IGNORE INTO internships (
     id,
     student_id,
     mentor_id,
+    mentor_email,
     company_id,
     start_date,
     end_date,
@@ -93,6 +84,7 @@ VALUES
         1,
         2,
         3,
+        'marko@be-terna.com',
         1,
         '2026-05-01',
         '2026-07-31',

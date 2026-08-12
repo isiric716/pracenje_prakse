@@ -4,6 +4,7 @@ const db = require("./db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const app = express();
+const PORT = Number(process.env.PORT ?? 3001);
 const { execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
@@ -48,6 +49,21 @@ function authenticateToken(req, res, next) {
 app.use(cors());
 app.use(express.json());
 
+const currentInternshipStatus = db.prepare(`
+  SELECT status
+  FROM internships
+  WHERE student_id = ?
+    AND status IN ('planned', 'active', 'cancelled')
+  ORDER BY created_at DESC, id DESC
+  LIMIT 1
+`);
+
+function getInternshipStatus(user) {
+  return user.role === "student"
+    ? currentInternshipStatus.get(user.id)?.status || null
+    : null;
+}
+
 function createAuthResponse(user) {
   const token = jwt.sign(
     {
@@ -67,68 +83,15 @@ function createAuthResponse(user) {
       fullName: `${user.first_name} ${user.last_name}`,
       email: user.email,
       role: user.role,
+      facultyName: user.faculty_name || "",
+      updatedAt: user.updated_at,
+      internshipStatus: getInternshipStatus(user),
     },
   };
 }
 
-app.get("/registration-options", (req, res) => {
-  try {
-    const faculties = db
-      .prepare(`
-        SELECT id, name, city
-        FROM faculties
-        ORDER BY name
-      `)
-      .all();
-
-    const companies = db
-      .prepare(`
-        SELECT id, name, city
-        FROM companies
-        WHERE is_active = 1
-        ORDER BY name
-      `)
-      .all();
-
-    const mentors = db
-      .prepare(`
-        SELECT
-          u.id,
-          u.first_name || ' ' || u.last_name AS full_name,
-          u.company_id,
-          c.name AS company_name
-        FROM users AS u
-        INNER JOIN companies AS c
-          ON u.company_id = c.id
-        WHERE u.role = 'mentor'
-          AND u.is_active = 1
-          AND c.is_active = 1
-        ORDER BY u.first_name, u.last_name
-      `)
-      .all();
-
-    res.json({ faculties, companies, mentors });
-  } catch (error) {
-    console.error("Greška pri dohvaćanju podataka za registraciju:", error);
-    res.status(500).json({
-      error: "Nije moguće dohvatiti podatke za registraciju.",
-    });
-  }
-});
-
 app.post("/register", async (req, res) => {
-  const {
-    fullName,
-    email,
-    password,
-    role,
-    facultyId,
-    companyId,
-    mentorId,
-    requiredHours,
-    startDate,
-    endDate,
-  } = req.body;
+  const { fullName, email, password, role } = req.body;
 
   const normalizedName = typeof fullName === "string"
     ? fullName.trim().replace(/\s+/g, " ")
@@ -162,33 +125,6 @@ app.post("/register", async (req, res) => {
     });
   }
 
-  const parsedFacultyId = Number(facultyId);
-  const parsedCompanyId = Number(companyId);
-  const parsedMentorId = Number(mentorId);
-  const parsedHours = Number(requiredHours);
-
-  if (role === "student") {
-    if (
-      !Number.isInteger(parsedFacultyId) ||
-      !Number.isInteger(parsedMentorId) ||
-      !Number.isFinite(parsedHours) ||
-      parsedHours <= 0 ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(startDate || "") ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(endDate || "") ||
-      endDate < startDate
-    ) {
-      return res.status(400).json({
-        error: "Ispunite sve podatke o stručnoj praksi ispravnim vrijednostima.",
-      });
-    }
-  }
-
-  if (role === "mentor" && !Number.isInteger(parsedCompanyId)) {
-    return res.status(400).json({
-      error: "Odaberite kompaniju.",
-    });
-  }
-
   try {
     const existingUser = db
       .prepare("SELECT id FROM users WHERE LOWER(email) = ?")
@@ -200,62 +136,22 @@ app.post("/register", async (req, res) => {
       });
     }
 
-    let mentor;
-
-    if (role === "student") {
-      const faculty = db
-        .prepare("SELECT id FROM faculties WHERE id = ?")
-        .get(parsedFacultyId);
-
-      mentor = db
-        .prepare(`
-          SELECT id, company_id
-          FROM users
-          WHERE id = ?
-            AND role = 'mentor'
-            AND is_active = 1
-        `)
-        .get(parsedMentorId);
-
-      if (!faculty || !mentor?.company_id) {
-        return res.status(400).json({
-          error: "Odabrani fakultet ili mentor nije dostupan.",
-        });
-      }
-    } else {
-      const company = db
-        .prepare("SELECT id FROM companies WHERE id = ? AND is_active = 1")
-        .get(parsedCompanyId);
-
-      if (!company) {
-        return res.status(400).json({
-          error: "Odabrana kompanija nije dostupna.",
-        });
-      }
-    }
-
     const firstName = nameParts.shift();
     const lastName = nameParts.join(" ");
     const passwordHash = await bcrypt.hash(password, 10);
 
-    db.exec("BEGIN IMMEDIATE");
-
     const userResult = db
       .prepare(`
         INSERT INTO users (
-          faculty_id,
-          company_id,
           first_name,
           last_name,
           email,
           password_hash,
           role
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
       `)
       .run(
-        role === "student" ? parsedFacultyId : null,
-        role === "mentor" ? parsedCompanyId : null,
         firstName,
         lastName,
         normalizedEmail,
@@ -265,33 +161,9 @@ app.post("/register", async (req, res) => {
 
     const userId = Number(userResult.lastInsertRowid);
 
-    if (role === "student") {
-      db.prepare(`
-        INSERT INTO internships (
-          student_id,
-          mentor_id,
-          company_id,
-          start_date,
-          end_date,
-          required_hours,
-          status
-        )
-        VALUES (?, ?, ?, ?, ?, ?, 'active')
-      `).run(
-        userId,
-        parsedMentorId,
-        mentor.company_id,
-        startDate,
-        endDate,
-        parsedHours
-      );
-    }
-
-    db.exec("COMMIT");
-
     const newUser = db
       .prepare(`
-        SELECT id, first_name, last_name, email, role
+        SELECT id, first_name, last_name, email, role, faculty_name, updated_at
         FROM users
         WHERE id = ?
       `)
@@ -299,12 +171,6 @@ app.post("/register", async (req, res) => {
 
     res.status(201).json(createAuthResponse(newUser));
   } catch (error) {
-    try {
-      db.exec("ROLLBACK");
-    } catch {
-      // Transakcija nije bila pokrenuta ili je već završena.
-    }
-
     console.error("Greška pri registraciji:", error);
 
     if (String(error.message).includes("UNIQUE constraint failed: users.email")) {
@@ -345,6 +211,8 @@ app.post("/login", async (req, res) => {
           email,
           password_hash,
           role,
+          faculty_name,
+          updated_at,
           is_active
         FROM users
         WHERE LOWER(email) = ?
@@ -384,46 +252,6 @@ app.post("/login", async (req, res) => {
       }
     });
 
-app.get("/faculties", (req, res) => {
-  try {
-    const faculties = db
-      .prepare(`
-        SELECT id, name, city
-        FROM faculties
-        ORDER BY name
-      `)
-      .all();
-
-    res.json(faculties);
-  } catch (error) {
-    console.error("Greška pri dohvaćanju fakulteta:", error);
-
-    res.status(500).json({
-      error: "Nije moguće dohvatiti fakultete.",
-    });
-  }
-});
-
-app.get("/companies", (req, res) => {
-  try {
-    const companies = db
-      .prepare(`
-        SELECT id, name, city
-        FROM companies
-        ORDER BY name
-      `)
-      .all();
-
-    res.json(companies);
-  } catch (error) {
-    console.error("Greška pri dohvaćanju kompanija:", error);
-
-    res.status(500).json({
-      error: "Nije moguće dohvatiti kompanije.",
-    });
-  }
-});
-
 app.get("/users/current", authenticateToken, (req, res) => {
   try {
     const studentId = req.user.userId;
@@ -435,7 +263,9 @@ app.get("/users/current", authenticateToken, (req, res) => {
           first_name,
           last_name,
           email,
-          role
+          role,
+          faculty_name,
+          updated_at
         FROM users
         WHERE id = ?
       `)
@@ -452,6 +282,9 @@ app.get("/users/current", authenticateToken, (req, res) => {
       fullName: `${user.first_name} ${user.last_name}`,
       email: user.email,
       role: user.role,
+      facultyName: user.faculty_name || "",
+      updatedAt: user.updated_at,
+      internshipStatus: getInternshipStatus(user),
     });
   } catch (error) {
     console.error("Greška pri dohvaćanju korisnika:", error);
@@ -462,9 +295,176 @@ app.get("/users/current", authenticateToken, (req, res) => {
   }
 });
 
+app.get("/internships/current", authenticateToken, (req, res) => {
+  if (req.user.role !== "student") {
+    return res.status(403).json({ error: "Pristup je dopušten samo studentima." });
+  }
+
+  try {
+    const internship = db
+      .prepare(`
+        SELECT
+          i.id,
+          i.mentor_id,
+          i.mentor_email,
+          c.name AS company_name,
+          c.city AS company_city,
+          CASE
+            WHEN mentor.id IS NULL THEN NULL
+            ELSE mentor.first_name || ' ' || mentor.last_name
+          END AS mentor_name,
+          i.start_date,
+          i.end_date,
+          i.required_hours,
+          i.status,
+          i.updated_at
+        FROM internships AS i
+        INNER JOIN companies AS c ON i.company_id = c.id
+        LEFT JOIN users AS mentor ON i.mentor_id = mentor.id
+        WHERE i.student_id = ?
+          AND i.status IN ('planned', 'active', 'cancelled')
+        ORDER BY i.created_at DESC, i.id DESC
+        LIMIT 1
+      `)
+      .get(req.user.userId);
+
+    res.json(internship || null);
+  } catch (error) {
+    console.error("Greška pri dohvaćanju prakse:", error);
+    res.status(500).json({ error: "Nije moguće dohvatiti praksu." });
+  }
+});
+
+app.post("/internships", authenticateToken, (req, res) => {
+  if (req.user.role !== "student") {
+    return res.status(403).json({ error: "Pristup je dopušten samo studentima." });
+  }
+
+  const studentId = req.user.userId;
+  const {
+    facultyName,
+    companyName,
+    companyCity,
+    mentorEmail,
+    startDate,
+    endDate,
+    requiredHours,
+  } = req.body;
+  const normalizedFaculty = typeof facultyName === "string" ? facultyName.trim() : "";
+  const normalizedCompany = typeof companyName === "string" ? companyName.trim() : "";
+  const normalizedCity = typeof companyCity === "string" ? companyCity.trim() : "";
+  const normalizedMentorEmail = typeof mentorEmail === "string"
+    ? mentorEmail.trim().toLowerCase()
+    : "";
+  const parsedHours = Number(requiredHours);
+
+  if (
+    !normalizedCompany ||
+    !normalizedCity ||
+    !/^\S+@\S+\.\S+$/.test(normalizedMentorEmail) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(startDate || "") ||
+    (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) ||
+    (endDate && endDate < startDate) ||
+    !Number.isFinite(parsedHours) ||
+    parsedHours <= 0
+  ) {
+    return res.status(400).json({ error: "Unesite ispravne podatke o praksi." });
+  }
+
+  let transactionStarted = false;
+
+  try {
+    db.exec("BEGIN IMMEDIATE;");
+    transactionStarted = true;
+
+    const existingInternship = db
+      .prepare(`
+        SELECT id FROM internships
+        WHERE student_id = ? AND status IN ('planned', 'active')
+      `)
+      .get(studentId);
+
+    if (existingInternship) {
+      db.exec("ROLLBACK;");
+      transactionStarted = false;
+      return res.status(409).json({ error: "Već imate praksu u tijeku ili na čekanju." });
+    }
+
+    const mentorAccount = db
+      .prepare("SELECT id, role FROM users WHERE LOWER(email) = ? AND is_active = 1")
+      .get(normalizedMentorEmail);
+
+    if (mentorAccount && mentorAccount.role !== "mentor") {
+      db.exec("ROLLBACK;");
+      transactionStarted = false;
+      return res.status(400).json({ error: "Navedena email adresa ne pripada mentorskom računu." });
+    }
+
+    let company = db
+      .prepare("SELECT id FROM companies WHERE LOWER(name) = LOWER(?) AND LOWER(city) = LOWER(?)")
+      .get(normalizedCompany, normalizedCity);
+
+    if (!company) {
+      const result = db
+        .prepare("INSERT INTO companies (name, city) VALUES (?, ?)")
+        .run(normalizedCompany, normalizedCity);
+      company = { id: Number(result.lastInsertRowid) };
+    }
+
+    db.prepare(`
+      UPDATE users
+      SET faculty_name = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(normalizedFaculty || null, studentId);
+
+    const result = db
+      .prepare(`
+        INSERT INTO internships (
+          student_id, mentor_id, mentor_email, company_id, start_date,
+          end_date, required_hours, status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'planned')
+      `)
+      .run(
+        studentId,
+        mentorAccount?.id || null,
+        normalizedMentorEmail,
+        company.id,
+        startDate,
+        endDate || null,
+        parsedHours
+      );
+
+    db.exec("COMMIT;");
+    transactionStarted = false;
+
+    res.status(201).json({
+      id: Number(result.lastInsertRowid),
+      mentor_id: mentorAccount?.id || null,
+      mentor_email: normalizedMentorEmail,
+      mentor_name: null,
+      company_name: normalizedCompany,
+      company_city: normalizedCity,
+      start_date: startDate,
+      end_date: endDate || null,
+      required_hours: parsedHours,
+      status: "planned",
+    });
+  } catch (error) {
+    if (transactionStarted) {
+      db.exec("ROLLBACK;");
+    }
+    console.error("Greška pri stvaranju prakse:", error);
+    if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return res.status(409).json({ error: "Već imate praksu u tijeku ili na čekanju." });
+    }
+    res.status(500).json({ error: "Praksu nije moguće spremiti." });
+  }
+});
+
 app.patch("/users/current", authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-  const { fullName, email, currentPassword, newPassword } = req.body;
+  const { fullName, email, facultyName, currentPassword, newPassword, updatedAt } = req.body;
   const normalizedName = typeof fullName === "string"
     ? fullName.trim().replace(/\s+/g, " ")
     : "";
@@ -480,6 +480,10 @@ app.patch("/users/current", authenticateToken, async (req, res) => {
 
   if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
     return res.status(400).json({ error: "Unesite ispravnu email adresu." });
+  }
+
+  if (typeof updatedAt !== "string" || !updatedAt) {
+    return res.status(400).json({ error: "Nedostaje verzija korisničkog profila." });
   }
 
   if (
@@ -537,18 +541,22 @@ app.patch("/users/current", authenticateToken, async (req, res) => {
           first_name = ?,
           last_name = ?,
           email = ?,
+          faculty_name = ?,
           password_hash = ?,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
         WHERE id = ?
-          AND password_hash = ?
+          AND updated_at = ?
       `)
       .run(
         firstName,
         lastName,
         normalizedEmail,
+        req.user.role === "student" && typeof facultyName === "string"
+          ? facultyName.trim() || null
+          : null,
         passwordHash,
         userId,
-        user.password_hash
+        updatedAt
       );
 
     if (result.changes !== 1) {
@@ -559,7 +567,7 @@ app.patch("/users/current", authenticateToken, async (req, res) => {
 
     const updatedUser = db
       .prepare(`
-        SELECT id, first_name, last_name, email, role
+        SELECT id, first_name, last_name, email, role, faculty_name, updated_at
         FROM users
         WHERE id = ?
       `)
@@ -574,6 +582,9 @@ app.patch("/users/current", authenticateToken, async (req, res) => {
         fullName: `${updatedUser.first_name} ${updatedUser.last_name}`,
         email: updatedUser.email,
         role: updatedUser.role,
+        facultyName: updatedUser.faculty_name || "",
+        updatedAt: updatedUser.updated_at,
+        internshipStatus: getInternshipStatus(updatedUser),
       },
     });
   } catch (error) {
@@ -597,12 +608,14 @@ app.get("/internships/active", authenticateToken, (req, res) => {
       .prepare(`
         SELECT
           i.id,
+          i.mentor_id,
           c.name AS company_name,
           u.first_name || ' ' || u.last_name AS mentor_name,
           i.start_date,
           i.end_date,
           i.required_hours,
-          i.status
+          i.status,
+          i.updated_at
         FROM internships AS i
         INNER JOIN companies AS c
           ON i.company_id = c.id
@@ -626,6 +639,117 @@ app.get("/internships/active", authenticateToken, (req, res) => {
     res.status(500).json({
       error: "Nije moguće dohvatiti aktivnu praksu.",
     });
+  }
+});
+
+app.patch("/internships/active", authenticateToken, (req, res) => {
+  if (req.user.role !== "student") {
+    return res.status(403).json({
+      error: "Pristup je dopušten samo studentima.",
+    });
+  }
+
+  const studentId = req.user.userId;
+  const { startDate, endDate, requiredHours, updatedAt } = req.body;
+  const parsedHours = Number(requiredHours);
+
+  if (
+    !Number.isFinite(parsedHours) ||
+    parsedHours <= 0 ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(startDate || "") ||
+    (endDate && !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) ||
+    (endDate && endDate < startDate) ||
+    typeof updatedAt !== "string" ||
+    !updatedAt
+  ) {
+    return res.status(400).json({
+      error: "Unesite ispravne podatke o stručnoj praksi.",
+    });
+  }
+
+  try {
+    const currentInternship = db
+      .prepare(`
+        SELECT
+          i.id,
+          COALESCE(SUM(e.hours), 0) AS completed_hours,
+          MIN(e.entry_date) AS first_entry_date,
+          MAX(e.entry_date) AS last_entry_date
+        FROM internships AS i
+        LEFT JOIN entries AS e ON e.internship_id = i.id
+        WHERE i.student_id = ? AND i.status = 'active'
+        GROUP BY i.id
+      `)
+      .get(studentId);
+
+    if (!currentInternship) {
+      return res.status(404).json({ error: "Aktivna praksa nije pronađena." });
+    }
+
+    if (parsedHours < currentInternship.completed_hours) {
+      return res.status(400).json({
+        error: `Potrebni sati ne mogu biti manji od već evidentiranih ${currentInternship.completed_hours} sati.`,
+      });
+    }
+
+    if (
+      (currentInternship.first_entry_date && startDate > currentInternship.first_entry_date) ||
+      (endDate && currentInternship.last_entry_date && endDate < currentInternship.last_entry_date)
+    ) {
+      return res.status(400).json({
+        error: "Razdoblje prakse mora obuhvatiti sve postojeće zapise u dnevniku.",
+      });
+    }
+
+    const result = db
+      .prepare(`
+        UPDATE internships
+        SET
+          start_date = ?,
+          end_date = ?,
+          required_hours = ?,
+          updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
+        WHERE student_id = ?
+          AND status = 'active'
+          AND updated_at = ?
+      `)
+      .run(
+        startDate,
+        endDate || null,
+        parsedHours,
+        studentId,
+        updatedAt
+      );
+
+    if (result.changes !== 1) {
+      return res.status(409).json({
+        error: "Praksa je promijenjena drugim zahtjevom. Osvježite stranicu i pokušajte ponovno.",
+      });
+    }
+
+    const internship = db
+      .prepare(`
+        SELECT
+          i.id,
+          i.mentor_id,
+          c.name AS company_name,
+          u.first_name || ' ' || u.last_name AS mentor_name,
+          i.start_date,
+          i.end_date,
+          i.required_hours,
+          i.status,
+          i.updated_at
+        FROM internships AS i
+        INNER JOIN companies AS c ON i.company_id = c.id
+        INNER JOIN users AS u ON i.mentor_id = u.id
+        WHERE i.student_id = ? AND i.status = 'active'
+      `)
+      .get(studentId);
+
+    res.json(internship);
+  } catch (error) {
+    console.error("Greška pri uređivanju prakse:", error);
+    res.status(500).json({ error: "Praksu nije moguće spremiti." });
   }
 });
 
@@ -1206,6 +1330,31 @@ app.get("/mentor/dashboard", authenticateToken, (req, res) => {
       });
     }
 
+    const mentor = db
+      .prepare("SELECT email FROM users WHERE id = ?")
+      .get(mentorId);
+
+    const invitations = db
+      .prepare(`
+        SELECT
+          i.id,
+          student.id AS student_id,
+          student.first_name || ' ' || student.last_name AS student_name,
+          student.email AS student_email,
+          c.name AS company_name,
+          c.city AS company_city,
+          i.start_date,
+          i.end_date,
+          i.required_hours
+        FROM internships AS i
+        INNER JOIN users AS student ON i.student_id = student.id
+        INNER JOIN companies AS c ON i.company_id = c.id
+        WHERE (i.mentor_id = ? OR LOWER(i.mentor_email) = LOWER(?))
+          AND i.status = 'planned'
+        ORDER BY i.created_at DESC
+      `)
+      .all(mentorId, mentor.email);
+
     const students = db
       .prepare(`
         SELECT
@@ -1226,6 +1375,7 @@ app.get("/mentor/dashboard", authenticateToken, (req, res) => {
         LEFT JOIN entries AS e
           ON e.internship_id = i.id
         WHERE i.mentor_id = ?
+          AND i.status IN ('active', 'completed')
         GROUP BY i.id
         ORDER BY
           CASE i.status
@@ -1262,7 +1412,7 @@ app.get("/mentor/dashboard", authenticateToken, (req, res) => {
       `)
       .all(mentorId);
 
-    res.json({ students, documents });
+    res.json({ invitations, students, documents });
   } catch (error) {
     console.error(
       "Greška pri dohvaćanju dokumenata mentora:",
@@ -1272,6 +1422,58 @@ app.get("/mentor/dashboard", authenticateToken, (req, res) => {
     res.status(500).json({
       error: "Nije moguće dohvatiti dokumente.",
     });
+  }
+});
+
+app.patch("/mentor/invitations/:id", authenticateToken, (req, res) => {
+  if (req.user.role !== "mentor") {
+    return res.status(403).json({ error: "Pristup je dopušten samo mentorima." });
+  }
+
+  const invitationId = Number(req.params.id);
+  const { decision } = req.body;
+
+  if (!Number.isInteger(invitationId) || !["accept", "reject"].includes(decision)) {
+    return res.status(400).json({ error: "Odluka nije ispravna." });
+  }
+
+  try {
+    const mentor = db
+      .prepare("SELECT email FROM users WHERE id = ? AND is_active = 1")
+      .get(req.user.userId);
+
+    const result = db
+      .prepare(`
+        UPDATE internships
+        SET
+          mentor_id = ?,
+          status = ?,
+          updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
+        WHERE id = ?
+          AND (mentor_id = ? OR LOWER(mentor_email) = LOWER(?))
+          AND status = 'planned'
+      `)
+      .run(
+        decision === "accept" ? req.user.userId : null,
+        decision === "accept" ? "active" : "cancelled",
+        invitationId,
+        req.user.userId,
+        mentor.email
+      );
+
+    if (result.changes !== 1) {
+      return res.status(409).json({
+        error: "Poziv je već obrađen ili više nije dostupan.",
+      });
+    }
+
+    res.json({
+      id: invitationId,
+      status: decision === "accept" ? "active" : "cancelled",
+    });
+  } catch (error) {
+    console.error("Greška pri obradi poziva:", error);
+    res.status(500).json({ error: "Poziv nije moguće obraditi." });
   }
 });
 
@@ -1491,6 +1693,6 @@ app.patch("/mentor/documents/:id/reject", authenticateToken, (req, res) => {
 });
 
 
-app.listen(3001, () => {
-  console.log("Backend radi na http://localhost:3001");
+app.listen(PORT, () => {
+  console.log(`Backend radi na http://localhost:${PORT}`);
 });

@@ -6,6 +6,7 @@ function Settings({ user, onUserUpdate }) {
   const [formData, setFormData] = useState({
     fullName: user.fullName,
     email: user.email,
+    facultyName: user.facultyName || "",
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
@@ -56,7 +57,8 @@ function Settings({ user, onUserUpdate }) {
 
     const profileChanged =
       formData.fullName.trim() !== user.fullName ||
-      formData.email.trim().toLowerCase() !== user.email.toLowerCase();
+      formData.email.trim().toLowerCase() !== user.email.toLowerCase() ||
+      (user.role === "student" && formData.facultyName.trim() !== (user.facultyName || ""));
 
     if (!profileChanged && !changesPassword) {
       setMessage({ type: "error", text: "Nema promjena za spremanje." });
@@ -80,8 +82,10 @@ function Settings({ user, onUserUpdate }) {
         body: JSON.stringify({
           fullName: formData.fullName,
           email: formData.email,
+          facultyName: formData.facultyName,
           currentPassword: formData.currentPassword,
           newPassword: formData.newPassword,
+          updatedAt: user.updatedAt,
         }),
       });
       const data = await response.json();
@@ -93,6 +97,7 @@ function Settings({ user, onUserUpdate }) {
         ...current,
         fullName: data.user.fullName,
         email: data.user.email,
+        facultyName: data.user.facultyName,
         currentPassword: "",
         newPassword: "",
         confirmPassword: "",
@@ -133,6 +138,12 @@ function Settings({ user, onUserUpdate }) {
               Email
               <input type="email" name="email" value={formData.email} onChange={handleChange} autoComplete="email" required />
             </label>
+            {user.role === "student" && (
+              <label>
+                Fakultet / visoko učilište
+                <input name="facultyName" value={formData.facultyName} onChange={handleChange} placeholder="Npr. FERIT" />
+              </label>
+            )}
             <label>
               Uloga
               <input value={user.role === "mentor" ? "Mentor" : "Student"} disabled />
