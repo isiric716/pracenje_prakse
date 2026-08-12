@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import Diary from "./pages/Diary";
 import MentorDashboard from "./pages/MentorDashboard";
 import Export from "./pages/Export";
+import Settings from "./pages/Settings";
 
 
 const STUDENT_NAV_ITEMS = [
@@ -153,13 +154,13 @@ function AppLayout({ children, user, onLogout }) {
               </svg>
               <span className="topbar-badge" />
             </button>
-            <div className="topbar-profile">
+            <button className="topbar-profile" type="button" onClick={() => navigate("/settings")}>
               <div className="topbar-avatar">{initials}</div>
               <span className="topbar-name">{displayName}</span>
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <polyline points="6 9 12 15 18 9" />
               </svg>
-            </div>
+            </button>
             <button className="topbar-logout-btn" type="button" onClick={onLogout}>
               <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M10 17l5-5-5-5" />
@@ -185,7 +186,7 @@ function ProtectedRoute({ user, isAuthReady, allowedRole, children }) {
     return <Navigate to="/" replace />;
   }
 
-  if (user.role !== allowedRole) {
+  if (allowedRole && user.role !== allowedRole) {
     return (
       <Navigate
         to={user.role === "mentor" ? "/mentor" : "/dashboard"}
@@ -303,6 +304,16 @@ function AppRoutes() {
         <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="mentor">
           <AppLayout user={user} onLogout={handleLogout}>
             <MentorDashboard user={user} />
+          </AppLayout>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/settings"
+      element={
+        <ProtectedRoute user={user} isAuthReady={isAuthReady}>
+          <AppLayout user={user} onLogout={handleLogout}>
+            <Settings user={user} onUserUpdate={setUser} />
           </AppLayout>
         </ProtectedRoute>
       }

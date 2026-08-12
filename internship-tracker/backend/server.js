@@ -462,6 +462,133 @@ app.get("/users/current", authenticateToken, (req, res) => {
   }
 });
 
+app.patch("/users/current", authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { fullName, email, currentPassword, newPassword } = req.body;
+  const normalizedName = typeof fullName === "string"
+    ? fullName.trim().replace(/\s+/g, " ")
+    : "";
+  const nameParts = normalizedName.split(" ").filter(Boolean);
+  const normalizedEmail = typeof email === "string"
+    ? email.trim().toLowerCase()
+    : "";
+  const changesPassword = Boolean(currentPassword || newPassword);
+
+  if (nameParts.length < 2) {
+    return res.status(400).json({ error: "Unesite ime i prezime." });
+  }
+
+  if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+    return res.status(400).json({ error: "Unesite ispravnu email adresu." });
+  }
+
+  if (
+    changesPassword &&
+    (
+      typeof currentPassword !== "string" ||
+      !currentPassword ||
+      typeof newPassword !== "string" ||
+      newPassword.length < 8
+    )
+  ) {
+    return res.status(400).json({
+      error: "Za promjenu lozinke unesite trenutnu lozinku i novu lozinku od najmanje 8 znakova.",
+    });
+  }
+
+  try {
+    const user = db
+      .prepare(`
+        SELECT id, password_hash
+        FROM users
+        WHERE id = ?
+          AND is_active = 1
+      `)
+      .get(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "Korisnik nije pronađen." });
+    }
+
+    let passwordHash = user.password_hash;
+
+    if (changesPassword) {
+      const passwordMatches = await bcrypt.compare(
+        currentPassword,
+        user.password_hash
+      );
+
+      if (!passwordMatches) {
+        return res.status(400).json({
+          error: "Trenutna lozinka nije ispravna.",
+        });
+      }
+
+      passwordHash = await bcrypt.hash(newPassword, 10);
+    }
+
+    const firstName = nameParts.shift();
+    const lastName = nameParts.join(" ");
+
+    const result = db
+      .prepare(`
+        UPDATE users
+        SET
+          first_name = ?,
+          last_name = ?,
+          email = ?,
+          password_hash = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+          AND password_hash = ?
+      `)
+      .run(
+        firstName,
+        lastName,
+        normalizedEmail,
+        passwordHash,
+        userId,
+        user.password_hash
+      );
+
+    if (result.changes !== 1) {
+      return res.status(409).json({
+        error: "Račun je promijenjen drugim zahtjevom. Osvježite stranicu i pokušajte ponovno.",
+      });
+    }
+
+    const updatedUser = db
+      .prepare(`
+        SELECT id, first_name, last_name, email, role
+        FROM users
+        WHERE id = ?
+      `)
+      .get(userId);
+
+    res.json({
+      message: changesPassword
+        ? "Profil i lozinka uspješno su spremljeni."
+        : "Profil je uspješno spremljen.",
+      user: {
+        id: updatedUser.id,
+        fullName: `${updatedUser.first_name} ${updatedUser.last_name}`,
+        email: updatedUser.email,
+        role: updatedUser.role,
+      },
+    });
+  } catch (error) {
+    console.error("Greška pri spremanju profila:", error);
+
+    if (String(error.message).includes("UNIQUE constraint failed: users.email")) {
+      return res.status(409).json({
+        error: "Korisnik s tom email adresom već postoji.",
+      });
+    }
+
+    res.status(500).json({ error: "Profil nije moguće spremiti." });
+  }
+});
+
 app.get("/internships/active", authenticateToken, (req, res) => {
   try {
     const studentId = req.user.userId;
