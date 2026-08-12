@@ -1,35 +1,26 @@
 import { useState } from "react";
-import Header from "../components/Header";
+import TopBar from "../components/TopBar";
 import Hero from "../components/Hero";
-import Prednosti from "../components/Prednosti";
+import LandingSections from "../components/LandingSections";
 import Auth from "../components/Auth";
 
 function LandingPage({ onLogin }) {
   const [authMode, setAuthMode] = useState(null);
 
-  function openLogin() {
-    setAuthMode("login");
-  }
-
-  function openRegister() {
-    setAuthMode("register");
-  }
-
-  function closeModal() {
-    setAuthMode(null);
-  }
-
   return (
-    <main className="landing-page">
-      <Header onLoginClick={openLogin} />
-      <Hero onStartClick={openRegister} onLoginClick={openLogin} />
-      <Prednosti />
+    <main id="top" className="landing-page">
+      <TopBar onLoginClick={() => setAuthMode("login")} />
+      <Hero
+        onStartClick={() => setAuthMode("register")}
+        onLoginClick={() => setAuthMode("login")}
+      />
+      <LandingSections />
 
       {authMode && (
         <Auth
           key={authMode}
           mode={authMode}
-          onClose={closeModal}
+          onClose={() => setAuthMode(null)}
           onSwitchMode={setAuthMode}
           onLogin={onLogin}
         />
