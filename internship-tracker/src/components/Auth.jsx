@@ -2,8 +2,6 @@ import "./Auth.css";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = "http://localhost:3001";
-
 function Auth({ mode, onClose, onSwitchMode, onLogin }) {
   const isRegister = mode === "register";
   const [form, setForm] = useState({
@@ -48,7 +46,7 @@ function Auth({ mode, onClose, onSwitchMode, onLogin }) {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/${isRegister ? "register" : "login"}`, {
+      const response = await fetch(`/${isRegister ? "register" : "login"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(

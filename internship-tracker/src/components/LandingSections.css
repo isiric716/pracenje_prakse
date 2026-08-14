@@ -1,5 +1,5 @@
 .landing-sections {
-  background: #020617;
+  background: #080b14;
 }
 
 .landing-section {
@@ -9,7 +9,7 @@
 
 .section-label {
   margin: 0 0 14px;
-  color: #60a5fa;
+  color: #a78bfa;
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -30,7 +30,7 @@
   grid-template-columns: 1.1fr 0.9fr;
   gap: 80px;
   align-items: start;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(148, 163, 184, .14);
 }
 
 .about-text {
@@ -43,7 +43,7 @@
 .section-heading > p:last-child,
 .feature-card p,
 .steps-list p {
-  color: #94a3b8;
+  color: #acb9cc;
   line-height: 1.7;
 }
 
@@ -75,19 +75,20 @@
 .feature-card {
   width: auto;
   padding: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, .14);
+  border-radius: 18px;
+  background: #111725;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .18);
   transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
 .feature-card:hover {
   transform: translateY(-4px);
-  border-color: rgba(96, 165, 250, 0.4);
+  border-color: rgba(167, 139, 250, .45);
 }
 
 .feature-card > span {
-  color: #3b82f6;
+  color: #a78bfa;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -105,7 +106,7 @@
 }
 
 .how-section {
-  background: #0f172a;
+  background: #111725;
 }
 
 .steps-list {
@@ -121,7 +122,7 @@
   display: flex;
   gap: 20px;
   padding: 0 30px;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid rgba(148, 163, 184, .16);
 }
 
 .steps-list li:first-child {
@@ -136,7 +137,7 @@
   height: 42px;
   place-items: center;
   border-radius: 50%;
-  background: #2563eb;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
   color: #ffffff;
   font-weight: 800;
 }

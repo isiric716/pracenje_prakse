@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-function Diary({ user }) {
+function Diary() {
   const token = localStorage.getItem("token");
   const [entries, setEntries] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -15,7 +15,7 @@ function Diary({ user }) {
   });
 
   useEffect(() => {
-  fetch("http://localhost:3001/entries", {
+  fetch("/entries", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -32,7 +32,7 @@ function Diary({ user }) {
       console.error("Greška pri dohvaćanju zapisa:", error);
     });
 
-  fetch("http://localhost:3001/internships/active", {
+  fetch("/internships/active", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -61,7 +61,7 @@ function Diary({ user }) {
 
   const handleSaveEntry = (entry) => {
     if (editingEntry) {
-      fetch(`http://localhost:3001/entries/${editingEntry.id}`, {
+      fetch(`/entries/${editingEntry.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -76,7 +76,7 @@ function Diary({ user }) {
           setIsOpen(false);
         });
     } else {
-      fetch("http://localhost:3001/entries", {
+      fetch("/entries", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -93,7 +93,7 @@ function Diary({ user }) {
   };
 
   const handleDelete = (id) => {
-    fetch(`http://localhost:3001/entries/${id}`, {
+    fetch(`/entries/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${token}`,

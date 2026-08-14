@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = "http://localhost:3001";
-
 const activityLabels = {
   development: "Razvoj",
   testing: "Testiranje",
@@ -14,7 +12,7 @@ function formatDate(value) {
   return value ? value.split("-").reverse().join(".") : "Nije određeno";
 }
 
-function Dashboard({ user }) {
+function Dashboard({ user, onInternshipStatusChange }) {
   const [entries, setEntries] = useState([]);
   const [internship, setInternship] = useState(null);
   const [setupForm, setSetupForm] = useState({
@@ -42,8 +40,8 @@ function Dashboard({ user }) {
     const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
     Promise.all([
-      fetch(`${API_URL}/entries`, { headers, signal: controller.signal }),
-      fetch(`${API_URL}/internships/current`, { headers, signal: controller.signal }),
+      fetch("/entries", { headers, signal: controller.signal }),
+      fetch("/internships/current", { headers, signal: controller.signal }),
     ])
       .then(async (responses) => {
         const data = await Promise.all(responses.map((response) => response.json()));
@@ -54,6 +52,7 @@ function Dashboard({ user }) {
       .then(([entriesData, internshipData]) => {
         setEntries(entriesData);
         setInternship(internshipData);
+        onInternshipStatusChange(internshipData?.status || null);
         if (internshipData?.status === "active") {
           setEditForm({
             startDate: internshipData.start_date,
@@ -70,7 +69,7 @@ function Dashboard({ user }) {
       });
 
     return () => requestRef.current?.abort();
-  }, []);
+  }, [onInternshipStatusChange]);
 
   function updateForm(setter) {
     return (event) => {
@@ -90,7 +89,7 @@ function Dashboard({ user }) {
     setMessage({ type: "", text: "" });
 
     try {
-      const response = await fetch(`${API_URL}${path}`, {
+      const response = await fetch(path, {
         method,
         headers: {
           "Content-Type": "application/json",
@@ -118,6 +117,7 @@ function Dashboard({ user }) {
     const data = await saveRequest("/internships", "POST", setupForm);
     if (data) {
       setInternship(data);
+      onInternshipStatusChange(data.status);
       setMessage({ type: "success", text: "Poziv je poslan mentoru na potvrdu." });
     }
   }

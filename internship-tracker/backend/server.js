@@ -1,6 +1,4 @@
 const express = require("express");
-const cors = require("cors");
-const db = require("./db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const app = express();
@@ -9,8 +7,10 @@ const { execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 process.loadEnvFile(path.join(__dirname, ".env"));
+const db = require("./db");
 
 const jwtSecret = process.env.JWT_SECRET;
+const storagePath = process.env.STORAGE_PATH || __dirname;
 
 if (!jwtSecret) {
   throw new Error("JWT_SECRET nije postavljen.");
@@ -39,14 +39,13 @@ function authenticateToken(req, res, next) {
     req.user = decoded;
 
     next();
-  } catch (error) {
+  } catch {
     return res.status(401).json({
       error: "Token nije važeći ili je istekao.",
     });
   }
 }
 
-app.use(cors());
 app.use(express.json());
 
 const currentInternshipStatus = db.prepare(`
@@ -62,6 +61,20 @@ function getInternshipStatus(user) {
   return user.role === "student"
     ? currentInternshipStatus.get(user.id)?.status || null
     : null;
+}
+
+function normalizeDocumentInfo(docInfo) {
+  if (typeof docInfo?.institutionName !== "string" || !docInfo.institutionName.trim()) {
+    return null;
+  }
+
+  return {
+    ...docInfo,
+    institutionName: docInfo.institutionName.trim(),
+    universityName: typeof docInfo.universityName === "string"
+      ? docInfo.universityName.trim()
+      : "",
+  };
 }
 
 function createAuthResponse(user) {
@@ -393,6 +406,12 @@ app.post("/internships", authenticateToken, (req, res) => {
     const mentorAccount = db
       .prepare("SELECT id, role FROM users WHERE LOWER(email) = ? AND is_active = 1")
       .get(normalizedMentorEmail);
+
+    if (mentorAccount?.id === studentId) {
+      db.exec("ROLLBACK;");
+      transactionStarted = false;
+      return res.status(400).json({ error: "Ne možete navesti vlastitu email adresu kao adresu mentora." });
+    }
 
     if (mentorAccount && mentorAccount.role !== "mentor") {
       db.exec("ROLLBACK;");
@@ -981,23 +1000,23 @@ app.delete("/entries/:id", authenticateToken, (req, res) => {
 
 app.post("/documents/generate", authenticateToken, (req, res) => {
   const studentId = req.user.userId;
-  const { docInfo } = req.body;
+  const docInfo = normalizeDocumentInfo(req.body.docInfo);
 
   if (!docInfo) {
     return res.status(400).json({
-      error: "Nedostaju podaci za dokument.",
+      error: "Unesite naziv fakulteta ili visokog učilišta.",
     });
   }
 
   const requestId = require("crypto").randomUUID();
 
   const tempDataPath = path.join(
-    __dirname,
+    storagePath,
     `temp_data_${requestId}.json`
   );
 
   const tempDocumentPath = path.join(
-    __dirname,
+    storagePath,
     `temp_document_${requestId}.docx`
   );
 
@@ -1112,11 +1131,11 @@ app.post("/documents/generate", authenticateToken, (req, res) => {
 
 app.post("/documents/submit", authenticateToken, (req, res) => {
   const studentId = req.user.userId;
-  const { docInfo } = req.body;
+  const docInfo = normalizeDocumentInfo(req.body.docInfo);
 
   if (!docInfo) {
     return res.status(400).json({
-      error: "Nedostaju podaci za dokument.",
+      error: "Unesite naziv fakulteta ili visokog učilišta.",
     });
   }
 
@@ -1217,14 +1236,14 @@ app.post("/documents/submit", authenticateToken, (req, res) => {
       entries: studentEntries,
     };
 
-    const documentsDirectory = path.join(__dirname, "documents");
+    const documentsDirectory = path.join(storagePath, "documents");
 
     if (!fs.existsSync(documentsDirectory)) {
       fs.mkdirSync(documentsDirectory);
     }
 
     tempPath = path.join(
-      __dirname,
+      storagePath,
       `temp_data_${requestId}.json`
     );
 
@@ -1692,6 +1711,13 @@ app.patch("/mentor/documents/:id/reject", authenticateToken, (req, res) => {
   }
 });
 
+
+const frontendPath = path.join(__dirname, "..", "dist");
+
+app.use(express.static(frontendPath));
+app.get("/{*splat}", (req, res) => {
+  res.sendFile(path.join(frontendPath, "index.html"));
+});
 
 app.listen(PORT, () => {
   console.log(`Backend radi na http://localhost:${PORT}`);

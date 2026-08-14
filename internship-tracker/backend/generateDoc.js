@@ -1,6 +1,6 @@
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  AlignmentType, BorderStyle, WidthType, ShadingType, VerticalAlign
+  AlignmentType, BorderStyle, WidthType, ShadingType
 } = require('docx');
 const fs = require('fs');
 
@@ -9,8 +9,6 @@ const { student, docInfo, entries } = data;
 
 const border = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
 const borders = { top: border, bottom: border, left: border, right: border };
-const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
-
 const W = 9360;
 
 function headerCell(text, colSpan) {
@@ -118,11 +116,11 @@ const doc = new Document({
       }
     },
     children: [
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 200 }, children: [new TextRun({ text: "Sveučilište Josipa Jurja Strossmayera u Osijeku", bold: true, size: 22, font: "Arial" })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 200 }, children: [new TextRun({ text: "Fakultet primijenjene matematike i informatike", bold: true, size: 22, font: "Arial" })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 400 }, children: [new TextRun({ text: "Trg Ljudevita Gaja 6, HR-31000 Osijek", size: 20, font: "Arial" })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 200 }, children: [new TextRun({ text: "STRUČNA PRAKSA ZA STUDENTE", bold: true, size: 28, font: "Arial" })] }),
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 600 }, children: [new TextRun({ text: "FAKULTETA PRIMIJENJENE MATEMATIKE I INFORMATIKE", bold: true, size: 24, font: "Arial" })] }),
+      ...(docInfo.universityName ? [
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 200 }, children: [new TextRun({ text: docInfo.universityName, bold: true, size: 22, font: "Arial" })] }),
+      ] : []),
+      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 300 }, children: [new TextRun({ text: docInfo.institutionName, bold: true, size: 22, font: "Arial" })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 600 }, children: [new TextRun({ text: "DNEVNIK STRUČNE PRAKSE", bold: true, size: 28, font: "Arial" })] }),
 
       new Table({
         width: { size: W, type: WidthType.DXA },
@@ -148,7 +146,7 @@ const doc = new Document({
           dataRow("Prezime i ime:", docInfo.mentor || ""),
           dataRow("E-mail:", docInfo.mentorEmail || ""),
           dataRow("Telefon:", docInfo.mentorPhone || ""),
-          new TableRow({ children: [headerCell("Nastavnik Fakulteta zadužen za praćenje stručne prakse", 2)] }),
+          new TableRow({ children: [headerCell("Koordinator visokog učilišta zadužen za praćenje stručne prakse", 2)] }),
           dataRow("Prezime i ime:", docInfo.teacherName || ""),
           dataRow("E-mail:", docInfo.teacherEmail || ""),
           dataRow("Telefon:", docInfo.teacherPhone || ""),
@@ -208,7 +206,7 @@ const doc = new Document({
             children: [
               new TableCell({ borders, width: { size: W / 3, type: WidthType.DXA }, margins: { top: 200, bottom: 200, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: "Voditelj stručne prakse u tvrtki", size: 18, font: "Arial" })] }), new Paragraph({ spacing: { before: 400 }, children: [new TextRun({ text: "_____________________", size: 18, font: "Arial" })] })] }),
               new TableCell({ borders, width: { size: W / 3, type: WidthType.DXA }, margins: { top: 200, bottom: 200, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: "Student/ica", size: 18, font: "Arial" })] }), new Paragraph({ spacing: { before: 400 }, children: [new TextRun({ text: "_____________________", size: 18, font: "Arial" })] })] }),
-              new TableCell({ borders, width: { size: W / 3, type: WidthType.DXA }, margins: { top: 200, bottom: 200, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: "Nastavnik Fakulteta zadužen za praćenje", size: 18, font: "Arial" })] }), new Paragraph({ spacing: { before: 400 }, children: [new TextRun({ text: "_____________________", size: 18, font: "Arial" })] })] }),
+              new TableCell({ borders, width: { size: W / 3, type: WidthType.DXA }, margins: { top: 200, bottom: 200, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: "Koordinator visokog učilišta", size: 18, font: "Arial" })] }), new Paragraph({ spacing: { before: 400 }, children: [new TextRun({ text: "_____________________", size: 18, font: "Arial" })] })] }),
             ]
           })
         ]

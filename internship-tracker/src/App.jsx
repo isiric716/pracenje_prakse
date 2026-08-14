@@ -1,6 +1,6 @@
 import "./App.css";
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Diary from "./pages/Diary";
@@ -77,6 +77,7 @@ const MENTOR_NAV_ITEMS = [
 function AppLayout({ children, user, onLogout }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const displayName = user?.fullName || "";
   const displayRole = user?.role === "mentor" ? "Mentor" : "Student";
@@ -150,21 +151,45 @@ function AppLayout({ children, user, onLogout }) {
       <div className="app-main">
         <header className="app-topbar">
           <div className="topbar-right">
-            <button className="topbar-profile" type="button" onClick={() => navigate("/settings")}>
-              <div className="topbar-avatar">{initials}</div>
-              <span className="topbar-name">{displayName}</span>
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            <button className="topbar-logout-btn" type="button" onClick={onLogout}>
-              <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M10 17l5-5-5-5" />
-                <path d="M15 12H3" />
-                <path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" />
-              </svg>
-              Odjava
-            </button>
+            <div
+              className="topbar-profile-menu"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  setProfileMenuOpen(false);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setProfileMenuOpen(false);
+                  event.currentTarget.querySelector(".topbar-profile")?.focus();
+                }
+              }}
+            >
+              <button
+                className="topbar-profile"
+                type="button"
+                aria-expanded={profileMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => setProfileMenuOpen((open) => !open)}
+              >
+                <div className="topbar-avatar">{initials}</div>
+                <span className="topbar-name">{displayName}</span>
+                <svg className={profileMenuOpen ? "topbar-profile-arrow topbar-profile-arrow--open" : "topbar-profile-arrow"} width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              {profileMenuOpen && (
+                <div className="topbar-dropdown" role="menu">
+                  <button type="button" role="menuitem" onClick={() => navigate("/settings")}>
+                    Moj profil
+                  </button>
+                  <button type="button" role="menuitem" onClick={onLogout}>
+                    Odjava
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
         <main className="app-content">{children}</main>
@@ -216,7 +241,7 @@ function AppRoutes() {
   const controller = new AbortController();
   authRequestRef.current = controller;
 
-  fetch("http://localhost:3001/users/current", {
+  fetch("/users/current", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -259,6 +284,14 @@ function AppRoutes() {
     navigate("/", { replace: true });
   }
 
+  const handleInternshipStatusChange = useCallback((internshipStatus) => {
+    setUser((current) => (
+      current && current.internshipStatus !== internshipStatus
+        ? { ...current, internshipStatus }
+        : current
+    ));
+  }, []);
+
   return (
     <Routes>
       <Route
@@ -270,7 +303,7 @@ function AppRoutes() {
       element={
         <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="student">
           <AppLayout user={user} onLogout={handleLogout}>
-            <Dashboard user={user} />
+            <Dashboard user={user} onInternshipStatusChange={handleInternshipStatusChange} />
           </AppLayout>
         </ProtectedRoute>
       }

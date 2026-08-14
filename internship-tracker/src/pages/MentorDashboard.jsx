@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-const API_URL = "http://localhost:3001";
-
 const internshipStatuses = {
   planned: "Planirana",
   active: "Aktivna",
@@ -29,7 +27,7 @@ function MentorDashboard() {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch(`${API_URL}/mentor/dashboard`, {
+    fetch("/mentor/dashboard", {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -55,7 +53,7 @@ function MentorDashboard() {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/mentor/documents/${id}/download`, {
+      const response = await fetch(`/mentor/documents/${id}/download`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -92,7 +90,7 @@ function MentorDashboard() {
 
     try {
       const response = await fetch(
-        `${API_URL}/mentor/documents/${documentId}/${decision}`,
+        `/mentor/documents/${documentId}/${decision}`,
         {
           method: "PATCH",
           headers: {
@@ -130,7 +128,7 @@ function MentorDashboard() {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/mentor/invitations/${invitation.id}`, {
+      const response = await fetch(`/mentor/invitations/${invitation.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

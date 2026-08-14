@@ -6,6 +6,8 @@ function Export({ user }) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [docInfo, setDocInfo] = useState({
+    institutionName: user?.facultyName || "",
+    universityName: "",
     indexNumber: "",
     study: "",
     year: "",
@@ -21,12 +23,12 @@ function Export({ user }) {
   const token = localStorage.getItem("token");
 
   Promise.all([
-    fetch("http://localhost:3001/entries", {
+    fetch("/entries", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     }),
-    fetch("http://localhost:3001/internships/active", {
+    fetch("/internships/active", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -56,11 +58,16 @@ function Export({ user }) {
   };
 
   const handleGenerate = async () => {
+    if (!docInfo.institutionName.trim()) {
+      alert("Unesite naziv fakulteta ili visokog učilišta.");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const response = await fetch(
-        "http://localhost:3001/documents/generate",
+        "/documents/generate",
         {
           method: "POST",
           headers: {
@@ -102,11 +109,16 @@ function Export({ user }) {
   };
 
   const handleSubmit = async () => {
+    if (!docInfo.institutionName.trim()) {
+      alert("Unesite naziv fakulteta ili visokog učilišta.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const response = await fetch(
-        "http://localhost:3001/documents/submit",
+        "/documents/submit",
         {
           method: "POST",
           headers: {
@@ -159,6 +171,27 @@ function Export({ user }) {
                 type="text"
                 value={user?.fullName || ""}
                 readOnly
+              />
+            </div>
+
+            <div className="doc-field">
+              <label>Fakultet / visoko učilište</label>
+              <input
+                type="text"
+                name="institutionName"
+                value={docInfo.institutionName}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div className="doc-field">
+              <label>Sveučilište (nije obavezno)</label>
+              <input
+                type="text"
+                name="universityName"
+                value={docInfo.universityName}
+                onChange={handleChange}
               />
             </div>
 
@@ -229,7 +262,7 @@ function Export({ user }) {
         </div>
 
         <div className="export-section">
-          <h3 className="export-section-title">Nastavnik fakulteta</h3>
+          <h3 className="export-section-title">Koordinator visokog učilišta</h3>
 
           <div className="doc-form">
             <div className="doc-field">
@@ -342,6 +375,17 @@ function Export({ user }) {
             <p>
               <strong>Student:</strong> {user?.fullName || "—"}
             </p>
+
+            <p>
+              <strong>Visoko učilište:</strong>{" "}
+              {docInfo.institutionName || "—"}
+            </p>
+
+            {docInfo.universityName && (
+              <p>
+                <strong>Sveučilište:</strong> {docInfo.universityName}
+              </p>
+            )}
 
             <p>
               <strong>Broj indeksa:</strong>{" "}

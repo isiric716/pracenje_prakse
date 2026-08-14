@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-const API_URL = "http://localhost:3001";
-
 function Settings({ user, onUserUpdate }) {
   const [formData, setFormData] = useState({
     fullName: user.fullName,
@@ -72,7 +70,7 @@ function Settings({ user, onUserUpdate }) {
     setMessage({ type: "", text: "" });
 
     try {
-      const response = await fetch(`${API_URL}/users/current`, {
+      const response = await fetch("/users/current", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
