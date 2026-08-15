@@ -1,4 +1,5 @@
 const { DatabaseSync } = require("node:sqlite");
+const bcrypt = require("bcryptjs");
 const path = require("path");
 const fs = require("fs");
 
@@ -185,6 +186,51 @@ function migrateDatabase() {
   }
 }
 
+function syncSuperAdmin() {
+  const email = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.SUPERADMIN_PASSWORD;
+
+  if (!email && !password) {
+    return;
+  }
+
+  if (!email || !password) {
+    throw new Error("SUPERADMIN_EMAIL i SUPERADMIN_PASSWORD moraju biti zajedno postavljeni.");
+  }
+
+  if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 12) {
+    throw new Error("Superadmin mora imati ispravan email i lozinku od najmanje 12 znakova.");
+  }
+
+  const existingUser = db
+    .prepare("SELECT id, role, password_hash FROM users WHERE LOWER(email) = ?")
+    .get(email);
+
+  if (existingUser && existingUser.role !== "super_admin") {
+    throw new Error("SUPERADMIN_EMAIL već pripada drugom korisniku.");
+  }
+
+  if (!existingUser) {
+    db.prepare(`
+      INSERT INTO users (first_name, last_name, email, password_hash, role)
+      VALUES ('Super', 'Administrator', ?, ?, 'super_admin')
+    `).run(email, bcrypt.hashSync(password, 12));
+  } else if (!bcrypt.compareSync(password, existingUser.password_hash)) {
+    db.prepare(`
+      UPDATE users
+      SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(bcrypt.hashSync(password, 12), existingUser.id);
+  }
+
+  db.prepare(`
+    DELETE FROM users
+    WHERE role = 'super_admin'
+      AND email = 'admin@practice-app.hr'
+      AND LOWER(email) <> ?
+  `).run(email);
+}
+
 try {
   db.exec(createTablesScript);
   migrateDatabase();
@@ -197,6 +243,7 @@ try {
     DROP TABLE IF EXISTS faculties;
   `);
   db.exec(seedScript);
+  syncSuperAdmin();
 
   console.log("SQLite baza uspješno inicijalizirana.");
 } catch (error) {

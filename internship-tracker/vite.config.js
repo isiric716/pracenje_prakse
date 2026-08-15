@@ -13,6 +13,7 @@ export default defineConfig({
       '/entries': 'http://localhost:3001',
       '/documents': 'http://localhost:3001',
       '/mentor': 'http://localhost:3001',
+      '/admin': 'http://localhost:3001',
     },
   },
 })

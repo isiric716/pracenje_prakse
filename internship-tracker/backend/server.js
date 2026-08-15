@@ -1339,6 +1339,84 @@ app.post("/documents/submit", authenticateToken, (req, res) => {
   }
 });
 
+app.get("/admin/dashboard", authenticateToken, (req, res) => {
+  if (req.user.role !== "super_admin") {
+    return res.status(403).json({ error: "Pristup je dopušten samo superadminu." });
+  }
+
+  try {
+    const summary = {
+      users: db.prepare("SELECT COUNT(*) AS count FROM users").get().count,
+      internships: db.prepare("SELECT COUNT(*) AS count FROM internships").get().count,
+      entries: db.prepare("SELECT COUNT(*) AS count FROM entries").get().count,
+      documents: db.prepare("SELECT COUNT(*) AS count FROM documents").get().count,
+    };
+
+    const users = db.prepare(`
+      SELECT
+        id,
+        first_name || ' ' || last_name AS full_name,
+        email,
+        role,
+        faculty_name,
+        is_active,
+        created_at
+      FROM users
+      ORDER BY created_at DESC
+    `).all();
+
+    const internships = db.prepare(`
+      SELECT
+        i.id,
+        student.first_name || ' ' || student.last_name AS student_name,
+        COALESCE(mentor.first_name || ' ' || mentor.last_name, i.mentor_email) AS mentor_name,
+        c.name AS company_name,
+        i.start_date,
+        i.end_date,
+        i.required_hours,
+        i.status
+      FROM internships AS i
+      INNER JOIN users AS student ON i.student_id = student.id
+      LEFT JOIN users AS mentor ON i.mentor_id = mentor.id
+      INNER JOIN companies AS c ON i.company_id = c.id
+      ORDER BY i.created_at DESC
+    `).all();
+
+    const entries = db.prepare(`
+      SELECT
+        e.id,
+        student.first_name || ' ' || student.last_name AS student_name,
+        e.entry_date,
+        e.activity_type,
+        e.hours,
+        e.description
+      FROM entries AS e
+      INNER JOIN internships AS i ON e.internship_id = i.id
+      INNER JOIN users AS student ON i.student_id = student.id
+      ORDER BY e.entry_date DESC, e.id DESC
+    `).all();
+
+    const documents = db.prepare(`
+      SELECT
+        d.id,
+        student.first_name || ' ' || student.last_name AS student_name,
+        d.status,
+        d.version_number,
+        d.file_name,
+        d.submitted_at
+      FROM documents AS d
+      INNER JOIN internships AS i ON d.internship_id = i.id
+      INNER JOIN users AS student ON i.student_id = student.id
+      ORDER BY d.updated_at DESC
+    `).all();
+
+    res.json({ summary, users, internships, entries, documents });
+  } catch (error) {
+    console.error("Greška pri dohvaćanju superadmin podataka:", error);
+    res.status(500).json({ error: "Nije moguće dohvatiti superadmin podatke." });
+  }
+});
+
 app.get("/mentor/dashboard", authenticateToken, (req, res) => {
   try {
     const mentorId = req.user.userId;

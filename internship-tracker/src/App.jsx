@@ -5,6 +5,7 @@ import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Diary from "./pages/Diary";
 import MentorDashboard from "./pages/MentorDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import Export from "./pages/Export";
 import Settings from "./pages/Settings";
 
@@ -74,17 +75,40 @@ const MENTOR_NAV_ITEMS = [
   },
 ];
 
+const ADMIN_NAV_ITEMS = [
+  {
+    to: "/admin",
+    label: "Pregled sustava",
+    icon: (
+      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </svg>
+    ),
+  },
+];
+
+function homePath(role) {
+  if (role === "super_admin") return "/admin";
+  if (role === "mentor") return "/mentor";
+  return "/dashboard";
+}
+
 function AppLayout({ children, user, onLogout }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const displayName = user?.fullName || "";
-  const displayRole = user?.role === "mentor" ? "Mentor" : "Student";
+  const displayRole = user?.role === "super_admin"
+    ? "Superadmin"
+    : user?.role === "mentor" ? "Mentor" : "Student";
   const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-  const navItems = user?.role === "mentor"
-    ? MENTOR_NAV_ITEMS
-    : STUDENT_NAV_ITEMS.filter(
+  const navItems = user?.role === "super_admin"
+    ? ADMIN_NAV_ITEMS
+    : user?.role === "mentor" ? MENTOR_NAV_ITEMS : STUDENT_NAV_ITEMS.filter(
         (item) => !item.requiresActiveInternship || user?.internshipStatus === "active"
       );
 
@@ -210,7 +234,7 @@ function ProtectedRoute({ user, isAuthReady, allowedRole, requiresActiveInternsh
   if (allowedRole && user.role !== allowedRole) {
     return (
       <Navigate
-        to={user.role === "mentor" ? "/mentor" : "/dashboard"}
+        to={homePath(user.role)}
         replace
       />
     );
@@ -337,6 +361,16 @@ function AppRoutes() {
         <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="mentor">
           <AppLayout user={user} onLogout={handleLogout}>
             <MentorDashboard user={user} />
+          </AppLayout>
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/admin"
+      element={
+        <ProtectedRoute user={user} isAuthReady={isAuthReady} allowedRole="super_admin">
+          <AppLayout user={user} onLogout={handleLogout}>
+            <AdminDashboard />
           </AppLayout>
         </ProtectedRoute>
       }

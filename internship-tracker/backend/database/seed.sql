@@ -41,15 +41,6 @@ INSERT OR IGNORE INTO users (
 )
 VALUES
     (
-        1,
-        NULL,
-        'Super',
-        'Administrator',
-        'admin@practice-app.hr',
-        '$2b$10$AZXEk9A.ap.5wj3PgDjJxeL4GJFU9zKuDmieeBxeQgRoO7Rq14ne2',
-        'super_admin'
-    ),
-    (
         2,
         'FERIT',
         'Ivona',

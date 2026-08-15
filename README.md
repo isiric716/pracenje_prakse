@@ -1,10 +1,12 @@
 # Evidencija stručne prakse
 
-Ovo je web aplikacija za lakše praćenje stručne prakse. Napravljena je za studente i mentore.
+Ovo je web aplikacija za lakše praćenje stručne prakse. Napravljena je za studente, mentore i superadmina.
 
 Student može dodati podatke o svojoj praksi, voditi dnevnik i pratiti koliko je sati odradio. Na kraju može napraviti DOCX dokument sa svim podacima i zapisima.
 
 Mentor dobiva poziv u aplikaciji. Može prihvatiti ili odbiti studenta te kasnije pregledati njegov dokument.
+
+Superadmin ima pregled svih korisnika, praksi, dnevnih zapisa i dokumenata.
 
 Poziv se ne šalje na pravi e-mail. Mentor se mora registrirati u aplikaciji s istom e-mail adresom koju je student upisao.
 
@@ -20,14 +22,20 @@ Poziv se ne šalje na pravi e-mail. Mentor se mora registrirati u aplikaciji s i
 
 Potreban je Node.js 22 ili noviji.
 
-Prvo treba instalirati sve pakete:
+Nakon kloniranja repozitorija treba otvoriti mapu aplikacije:
+
+```powershell
+cd internship-tracker
+```
+
+Zatim treba instalirati sve pakete:
 
 ```powershell
 npm install
 npm --prefix backend install
 ```
 
-Zatim treba napraviti `.env` datoteku:
+Nakon toga treba napraviti `.env` datoteku:
 
 ```powershell
 Copy-Item backend\.env.example backend\.env
@@ -35,7 +43,16 @@ Copy-Item backend\.env.example backend\.env
 
 U `backend/.env` treba promijeniti `JWT_SECRET` i upisati neki dugi nasumični ključ.
 
-Nakon toga se aplikacija može pokrenuti ovako:
+Za superadmin račun u istoj datoteci treba upisati email i lozinku od najmanje 12 znakova:
+
+```text
+SUPERADMIN_EMAIL=vas_email
+SUPERADMIN_PASSWORD=vasa_lozinka
+```
+
+Superadmin se ne može napraviti preko obične registracije.
+
+Aplikacija se zatim može pokrenuti ovako:
 
 ```powershell
 npm run build

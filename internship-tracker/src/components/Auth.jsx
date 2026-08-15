@@ -65,7 +65,11 @@ function Auth({ mode, onClose, onSwitchMode, onLogin }) {
 
       localStorage.setItem("token", data.token);
       onLogin(data.user);
-      navigate(data.user.role === "mentor" ? "/mentor" : "/dashboard");
+      navigate(
+        data.user.role === "super_admin"
+          ? "/admin"
+          : data.user.role === "mentor" ? "/mentor" : "/dashboard"
+      );
     } catch (submitError) {
       setError(submitError.message);
     } finally {
