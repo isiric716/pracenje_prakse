@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 function Diary() {
   const token = localStorage.getItem("token");
   const [entries, setEntries] = useState([]);
+  const [internship, setInternship] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
+  const [isSavingDocData, setIsSavingDocData] = useState(false);
   const [docData, setDocData] = useState({
     companyName: "",
     mentor: "",
@@ -45,6 +47,7 @@ function Diary() {
       return res.json();
     })
     .then((data) => {
+      setInternship(data);
       setDocData({
         companyName: data.company_name,
         mentor: data.mentor_name,
@@ -89,6 +92,53 @@ function Diary() {
           setEntries([...entries, newEntry]);
           setIsOpen(false);
         });
+    }
+  };
+
+  const handleSaveDocData = async () => {
+    if (!internship) {
+      alert("Nema aktivne prakse za spremanje.");
+      return;
+    }
+
+    setIsSavingDocData(true);
+
+    try {
+      const response = await fetch("/internships/active", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          startDate: docData.startDate,
+          endDate: docData.endDate,
+          requiredHours: internship.required_hours,
+          updatedAt: internship.updated_at,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Nije moguće spremiti podatke.");
+      }
+
+      setInternship(data);
+      setDocData({
+        companyName: data.company_name,
+        mentor: data.mentor_name,
+        study: docData.study,
+        indexNumber: docData.indexNumber,
+        startDate: data.start_date,
+        endDate: data.end_date,
+      });
+
+      alert("Podaci o praksi su spremljeni.");
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setIsSavingDocData(false);
     }
   };
 
@@ -256,7 +306,13 @@ function Diary() {
                 onChange={(e) => setDocData({ ...docData, endDate: e.target.value })}
               />
             </div>
-            <button className="btn-save-doc">Spremi podatke</button>
+            <button
+              className="btn-save-doc"
+              onClick={handleSaveDocData}
+              disabled={isSavingDocData}
+            >
+              {isSavingDocData ? "Spremanje..." : "Spremi podatke"}
+            </button>
           </div>
         </div>
       </div>
