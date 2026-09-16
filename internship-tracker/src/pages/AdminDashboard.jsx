@@ -37,9 +37,7 @@ function AdminDashboard() {
     const controller = new AbortController();
 
     fetch(`${API_URL}/admin/dashboard`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
+      credentials: "include",
       signal: controller.signal,
     })
       .then(async (response) => {

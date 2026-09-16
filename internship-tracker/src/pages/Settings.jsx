@@ -75,8 +75,8 @@ function Settings({ user, onUserUpdate }) {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
+        credentials: "include",
         signal: controller.signal,
         body: JSON.stringify({
           fullName: formData.fullName,

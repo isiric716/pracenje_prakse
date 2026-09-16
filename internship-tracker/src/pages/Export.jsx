@@ -21,18 +21,12 @@ function Export({ user }) {
   });
 
   useEffect(() => {
-  const token = localStorage.getItem("token");
-
   Promise.all([
     fetch(`${API_URL}/entries`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: "include",
     }),
     fetch(`${API_URL}/internships/active`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: "include",
     }),
   ]).then(async ([entriesResponse, internshipResponse]) => {
     if (!entriesResponse.ok) {
@@ -73,8 +67,8 @@ function Export({ user }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
+          credentials: "include",
           body: JSON.stringify({
             docInfo,
           }),
@@ -124,8 +118,8 @@ function Export({ user }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
+          credentials: "include",
           body: JSON.stringify({
             docInfo,
           }),

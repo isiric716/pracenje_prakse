@@ -38,11 +38,10 @@ function Dashboard({ user, onInternshipStatusChange }) {
   useEffect(() => {
     const controller = new AbortController();
     requestRef.current = controller;
-    const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
     Promise.all([
-      fetch(`${API_URL}/entries`, { headers, signal: controller.signal }),
-      fetch(`${API_URL}/internships/current`, { headers, signal: controller.signal }),
+      fetch(`${API_URL}/entries`, { credentials: "include", signal: controller.signal }),
+      fetch(`${API_URL}/internships/current`, { credentials: "include", signal: controller.signal }),
     ])
       .then(async (responses) => {
         const data = await Promise.all(responses.map((response) => response.json()));
@@ -94,8 +93,8 @@ function Dashboard({ user, onInternshipStatusChange }) {
         method,
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
+        credentials: "include",
         signal: controller.signal,
         body: JSON.stringify(body),
       });

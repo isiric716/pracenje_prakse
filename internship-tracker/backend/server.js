@@ -21,20 +21,32 @@ if (!jwtSecret) {
   throw new Error("JWT_SECRET nije postavljen.");
 }
 
-function authenticateToken(req, res, next) {
+function getTokenFromRequest(req) {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader) {
-    return res.status(401).json({
-      error: "Nedostaje autentikacijski token.",
-    });
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    return authHeader.split(" ")[1];
   }
 
-  const token = authHeader.split(" ")[1];
+  const cookieHeader = req.headers.cookie || "";
+  const cookieEntry = cookieHeader
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith("token="));
+
+  if (!cookieEntry) {
+    return null;
+  }
+
+  return decodeURIComponent(cookieEntry.slice("token=".length));
+}
+
+function authenticateToken(req, res, next) {
+  const token = getTokenFromRequest(req);
 
   if (!token) {
     return res.status(401).json({
-      error: "Token nije ispravno poslan.",
+      error: "Nedostaje autentikacijski token.",
     });
   }
 
@@ -49,6 +61,18 @@ function authenticateToken(req, res, next) {
       error: "Token nije važeći ili je istekao.",
     });
   }
+}
+
+function setAuthCookie(res, token) {
+  const secure = process.env.NODE_ENV === "production" || process.env.RENDER === "true";
+
+  res.cookie("token", token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure,
+    path: "/",
+    maxAge: 8 * 60 * 60 * 1000,
+  });
 }
 
 app.use(express.json());
@@ -133,6 +157,11 @@ function createAuthResponse(user) {
   };
 }
 
+app.post("/logout", (req, res) => {
+  res.clearCookie("token", { path: "/" });
+  res.json({ success: true });
+});
+
 app.post("/register", async (req, res) => {
   const { fullName, email, password, role } = req.body;
 
@@ -212,7 +241,9 @@ app.post("/register", async (req, res) => {
       `)
       .get(userId);
 
-    res.status(201).json(createAuthResponse(newUser));
+    const authResponse = createAuthResponse(newUser);
+    setAuthCookie(res, authResponse.token);
+    res.status(201).json(authResponse);
   } catch (error) {
     console.error("Greška pri registraciji:", error);
 
@@ -285,7 +316,9 @@ app.post("/login", async (req, res) => {
       });
     }
 
-    res.json(createAuthResponse(user));
+    const authResponse = createAuthResponse(user);
+    setAuthCookie(res, authResponse.token);
+    res.json(authResponse);
       } catch (error) {
         console.error("Greška pri prijavi:", error);
 

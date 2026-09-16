@@ -29,9 +29,7 @@ function MentorDashboard() {
     const controller = new AbortController();
 
     fetch(`${API_URL}/mentor/dashboard`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
+      credentials: "include",
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -55,9 +53,7 @@ function MentorDashboard() {
 
     try {
       const response = await fetch(`${API_URL}/mentor/documents/${id}/download`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -96,8 +92,8 @@ function MentorDashboard() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
+          credentials: "include",
           body: decision === "reject" ? JSON.stringify({ comment }) : undefined,
         }
       );
@@ -133,8 +129,8 @@ function MentorDashboard() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
+        credentials: "include",
         body: JSON.stringify({ decision }),
       });
       const data = await response.json();

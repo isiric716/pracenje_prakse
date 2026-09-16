@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { API_URL } from "../api";
 
 function Diary() {
-  const token = localStorage.getItem("token");
   const [entries, setEntries] = useState([]);
   const [internship, setInternship] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -19,9 +18,7 @@ function Diary() {
 
   useEffect(() => {
   fetch(`${API_URL}/entries`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    credentials: "include",
   })
     .then((res) => {
       if (!res.ok) {
@@ -36,9 +33,7 @@ function Diary() {
     });
 
   fetch(`${API_URL}/internships/active`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    credentials: "include",
   })
     .then((res) => {
       if (!res.ok) {
@@ -61,7 +56,7 @@ function Diary() {
     .catch((error) => {
       console.error("Greška pri dohvaćanju prakse:", error);
     });
-}, [token]);
+}, []);
 
   const handleSaveEntry = (entry) => {
     if (editingEntry) {
@@ -69,8 +64,8 @@ function Diary() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include",
         body: JSON.stringify(entry),
       })
         .then((res) => res.json())
@@ -84,8 +79,8 @@ function Diary() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include",
         body: JSON.stringify(entry),
       })
         .then((res) => res.json())
@@ -109,8 +104,8 @@ function Diary() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include",
         body: JSON.stringify({
           startDate: docData.startDate,
           endDate: docData.endDate,
@@ -146,9 +141,7 @@ function Diary() {
   const handleDelete = (id) => {
     fetch(`${API_URL}/entries/${id}`, {
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: "include",
     }).then(() => {
       setEntries(entries.filter((e) => e.id !== id));
     });

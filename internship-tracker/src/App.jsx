@@ -250,50 +250,39 @@ function ProtectedRoute({ user, isAuthReady, allowedRole, requiresActiveInternsh
 
 function AppRoutes() {
   const [user, setUser] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(
-    () => !localStorage.getItem("token")
-  );
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const authRequestRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-  const token = localStorage.getItem("token");
+    const controller = new AbortController();
+    authRequestRef.current = controller;
 
-  if (!token) {
-    return;
-  }
-
-  const controller = new AbortController();
-  authRequestRef.current = controller;
-
-  fetch(`${API_URL}/users/current`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    signal: controller.signal,
-  })
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error("Nije moguće dohvatiti korisnika.");
-      }
-
-      return response.json();
+    fetch(`${API_URL}/users/current`, {
+      credentials: "include",
+      signal: controller.signal,
     })
-    .then(setUser)
-    .catch((error) => {
-      if (error.name !== "AbortError") {
-        localStorage.removeItem("token");
-        setUser(null);
-      }
-    })
-    .finally(() => {
-      if (!controller.signal.aborted) {
-        setIsAuthReady(true);
-      }
-    });
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Nije moguće dohvatiti korisnika.");
+        }
 
-  return () => controller.abort();
-}, []);
+        return response.json();
+      })
+      .then(setUser)
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          setUser(null);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsAuthReady(true);
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
 
   function handleLogin(authenticatedUser) {
     authRequestRef.current?.abort();
@@ -303,7 +292,10 @@ function AppRoutes() {
 
   function handleLogout() {
     authRequestRef.current?.abort();
-    localStorage.removeItem("token");
+    fetch(`${API_URL}/logout`, {
+      method: "POST",
+      credentials: "include",
+    }).catch(() => {});
     setUser(null);
     setIsAuthReady(true);
     navigate("/", { replace: true });

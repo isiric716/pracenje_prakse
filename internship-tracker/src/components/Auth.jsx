@@ -50,6 +50,7 @@ function Auth({ mode, onClose, onSwitchMode, onLogin }) {
       const response = await fetch(`${API_URL}/${isRegister ? "register" : "login"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(
           isRegister
             ? {
@@ -64,7 +65,7 @@ function Auth({ mode, onClose, onSwitchMode, onLogin }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
 
-      localStorage.setItem("token", data.token);
+      localStorage.removeItem("token");
       onLogin(data.user);
       navigate(
         data.user.role === "super_admin"
