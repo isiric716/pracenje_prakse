@@ -1,5 +1,5 @@
 import "./App.css";
-import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate } from "react-router-dom";
+import { HashRouter, Routes, Route, NavLink, Navigate, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_URL } from "./api";
 import LandingPage from "./pages/LandingPage";
@@ -392,9 +392,9 @@ function AppRoutes() {
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <AppRoutes />
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
