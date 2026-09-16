@@ -6,7 +6,12 @@ const PORT = Number(process.env.PORT ?? 3001);
 const { execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
-process.loadEnvFile(path.join(__dirname, ".env"));
+
+const envFilePath = path.join(__dirname, ".env");
+if (fs.existsSync(envFilePath)) {
+  process.loadEnvFile(envFilePath);
+}
+
 const db = require("./db");
 
 const jwtSecret = process.env.JWT_SECRET;
