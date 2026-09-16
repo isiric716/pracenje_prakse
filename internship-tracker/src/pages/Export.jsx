@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_URL } from "../api";
 
 function Export({ user }) {
   const [entries, setEntries] = useState([]);
@@ -23,12 +24,12 @@ function Export({ user }) {
   const token = localStorage.getItem("token");
 
   Promise.all([
-    fetch("/entries", {
+    fetch(`${API_URL}/entries`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     }),
-    fetch("/internships/active", {
+    fetch(`${API_URL}/internships/active`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -67,7 +68,7 @@ function Export({ user }) {
 
     try {
       const response = await fetch(
-        "/documents/generate",
+        `${API_URL}/documents/generate`,
         {
           method: "POST",
           headers: {
@@ -118,7 +119,7 @@ function Export({ user }) {
 
     try {
       const response = await fetch(
-        "/documents/submit",
+        `${API_URL}/documents/submit`,
         {
           method: "POST",
           headers: {

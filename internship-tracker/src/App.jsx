@@ -1,6 +1,7 @@
 import "./App.css";
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { API_URL } from "./api";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Diary from "./pages/Diary";
@@ -265,7 +266,7 @@ function AppRoutes() {
   const controller = new AbortController();
   authRequestRef.current = controller;
 
-  fetch("/users/current", {
+  fetch(`${API_URL}/users/current`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },

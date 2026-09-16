@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_URL } from "../api";
 
 function Diary() {
   const token = localStorage.getItem("token");
@@ -17,7 +18,7 @@ function Diary() {
   });
 
   useEffect(() => {
-  fetch("/entries", {
+  fetch(`${API_URL}/entries`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -34,7 +35,7 @@ function Diary() {
       console.error("Greška pri dohvaćanju zapisa:", error);
     });
 
-  fetch("/internships/active", {
+  fetch(`${API_URL}/internships/active`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -64,7 +65,7 @@ function Diary() {
 
   const handleSaveEntry = (entry) => {
     if (editingEntry) {
-      fetch(`/entries/${editingEntry.id}`, {
+      fetch(`${API_URL}/entries/${editingEntry.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -79,7 +80,7 @@ function Diary() {
           setIsOpen(false);
         });
     } else {
-      fetch("/entries", {
+      fetch(`${API_URL}/entries`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -104,7 +105,7 @@ function Diary() {
     setIsSavingDocData(true);
 
     try {
-      const response = await fetch("/internships/active", {
+      const response = await fetch(`${API_URL}/internships/active`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -143,7 +144,7 @@ function Diary() {
   };
 
   const handleDelete = (id) => {
-    fetch(`/entries/${id}`, {
+    fetch(`${API_URL}/entries/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${token}`,

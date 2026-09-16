@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_URL } from "../api";
 
 const activityLabels = {
   development: "Razvoj",
@@ -40,8 +41,8 @@ function Dashboard({ user, onInternshipStatusChange }) {
     const headers = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
     Promise.all([
-      fetch("/entries", { headers, signal: controller.signal }),
-      fetch("/internships/current", { headers, signal: controller.signal }),
+      fetch(`${API_URL}/entries`, { headers, signal: controller.signal }),
+      fetch(`${API_URL}/internships/current`, { headers, signal: controller.signal }),
     ])
       .then(async (responses) => {
         const data = await Promise.all(responses.map((response) => response.json()));
@@ -89,7 +90,7 @@ function Dashboard({ user, onInternshipStatusChange }) {
     setMessage({ type: "", text: "" });
 
     try {
-      const response = await fetch(path, {
+      const response = await fetch(`${API_URL}${path}`, {
         method,
         headers: {
           "Content-Type": "application/json",

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_URL } from "../api";
 
 const roleLabels = {
   student: "Student",
@@ -35,7 +36,7 @@ function AdminDashboard() {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch("/admin/dashboard", {
+    fetch(`${API_URL}/admin/dashboard`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
