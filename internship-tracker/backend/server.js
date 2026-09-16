@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const app = express();
+app.set("trust proxy", 1);
 const PORT = Number(process.env.PORT ?? 3001);
 const { execSync } = require("child_process");
 const path = require("path");
@@ -64,12 +65,12 @@ function authenticateToken(req, res, next) {
 }
 
 function setAuthCookie(res, token) {
-  const secure = process.env.NODE_ENV === "production" || process.env.RENDER === "true";
+  const isProduction = process.env.NODE_ENV === "production" || process.env.RENDER === "true";
 
   res.cookie("token", token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure,
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
     path: "/",
     maxAge: 8 * 60 * 60 * 1000,
   });
