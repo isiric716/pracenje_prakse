@@ -19,6 +19,25 @@ function formatDate(value) {
   return value ? value.split("-").reverse().join(".") : "Nije određeno";
 }
 
+function formatDateTime(value) {
+  if (!value) return "Nije određeno";
+
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const date = new Date(normalized);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("hr-HR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function Dashboard({ user, onInternshipStatusChange }) {
   const [entries, setEntries] = useState([]);
   const [internship, setInternship] = useState(null);
@@ -279,7 +298,7 @@ function Dashboard({ user, onInternshipStatusChange }) {
           <dl className="internship-details">
             <div><dt>Verzija</dt><dd>v{documentInfo.version_number}</dd></div>
             <div><dt>Status</dt><dd>{documentStatusLabels[documentInfo.status] || documentInfo.status}</dd></div>
-            <div><dt>Datum predaje</dt><dd>{formatDate(documentInfo.submitted_at)}</dd></div>
+            <div><dt>Datum predaje</dt><dd>{formatDateTime(documentInfo.submitted_at)}</dd></div>
           </dl>
 
           {documentInfo.status === "rejected" && (
