@@ -867,6 +867,40 @@ app.get("/entries", authenticateToken, (req, res) => {
   }
 });
 
+app.get("/documents", authenticateToken, (req, res) => {
+  try {
+    const studentId = req.user.userId;
+
+    const document = db
+      .prepare(`
+        SELECT
+          d.id,
+          d.status,
+          d.version_number,
+          d.file_name,
+          d.submitted_at,
+          d.mentor_comment,
+          d.approved_at,
+          d.updated_at
+        FROM documents AS d
+        INNER JOIN internships AS i
+          ON d.internship_id = i.id
+        WHERE i.student_id = ?
+        ORDER BY d.updated_at DESC, d.id DESC
+        LIMIT 1
+      `)
+      .get(studentId);
+
+    res.json(document || null);
+  } catch (error) {
+    console.error("Greška pri dohvaćanju statusa dokumenta:", error);
+
+    res.status(500).json({
+      error: "Nije moguće dohvatiti status dokumenta.",
+    });
+  }
+});
+
 app.post("/entries", authenticateToken, (req, res) => {
   try {
     const studentId = req.user.userId;

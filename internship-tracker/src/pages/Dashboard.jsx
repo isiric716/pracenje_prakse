@@ -9,6 +9,12 @@ const activityLabels = {
   other: "Ostalo",
 };
 
+const documentStatusLabels = {
+  pending: "Čeka pregled",
+  approved: "Odobren",
+  rejected: "Vraćen na doradu",
+};
+
 function formatDate(value) {
   return value ? value.split("-").reverse().join(".") : "Nije određeno";
 }
@@ -16,6 +22,7 @@ function formatDate(value) {
 function Dashboard({ user, onInternshipStatusChange }) {
   const [entries, setEntries] = useState([]);
   const [internship, setInternship] = useState(null);
+  const [documentInfo, setDocumentInfo] = useState(null);
   const [setupForm, setSetupForm] = useState({
     facultyName: user.facultyName || "",
     companyName: "",
@@ -42,6 +49,7 @@ function Dashboard({ user, onInternshipStatusChange }) {
     Promise.all([
       fetch(`${API_URL}/entries`, { credentials: "include", signal: controller.signal }),
       fetch(`${API_URL}/internships/current`, { credentials: "include", signal: controller.signal }),
+      fetch(`${API_URL}/documents`, { credentials: "include", signal: controller.signal }),
     ])
       .then(async (responses) => {
         const data = await Promise.all(responses.map((response) => response.json()));
@@ -49,9 +57,10 @@ function Dashboard({ user, onInternshipStatusChange }) {
         if (failedIndex !== -1) throw new Error(data[failedIndex].error);
         return data;
       })
-      .then(([entriesData, internshipData]) => {
+      .then(([entriesData, internshipData, documentData]) => {
         setEntries(entriesData);
         setInternship(internshipData);
+        setDocumentInfo(documentData);
         onInternshipStatusChange(internshipData?.status || null);
         if (internshipData?.status === "active") {
           setEditForm({
@@ -257,6 +266,29 @@ function Dashboard({ user, onInternshipStatusChange }) {
     <section className="dashboard">
       <h1 className="dashboard-title">Dashboard</h1>
       {message.text && <p className={`dashboard-message dashboard-message--${message.type}`} role="status">{message.text}</p>}
+
+      {documentInfo && (
+        <section className="internship-card" aria-labelledby="document-status-title">
+          <div className="internship-card-heading">
+            <div>
+              <p>Dokument</p>
+              <h2 id="document-status-title">Status dokumenta</h2>
+            </div>
+          </div>
+
+          <dl className="internship-details">
+            <div><dt>Verzija</dt><dd>v{documentInfo.version_number}</dd></div>
+            <div><dt>Status</dt><dd>{documentStatusLabels[documentInfo.status] || documentInfo.status}</dd></div>
+            <div><dt>Datum predaje</dt><dd>{formatDate(documentInfo.submitted_at)}</dd></div>
+          </dl>
+
+          {documentInfo.status === "rejected" && (
+            <div className="dashboard-message dashboard-message--error" role="alert">
+              <strong>Komentar mentora:</strong> {documentInfo.mentor_comment || "Mentor nije ostavio komentar."}
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="internship-card" aria-labelledby="internship-title">
         <div className="internship-card-heading">
