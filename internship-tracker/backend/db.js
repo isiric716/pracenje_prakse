@@ -3,11 +3,14 @@ const bcrypt = require("bcryptjs");
 const path = require("path");
 const fs = require("fs");
 
-const databasePath = process.env.DATABASE_PATH || path.join(
+const databasePath = path.join(
   __dirname,
   "database",
   "internship.db"
 );
+
+fs.mkdirSync(path.dirname(databasePath), { recursive: true });
+console.log("Using SQLite database:", databasePath);
 
 const createTablesPath = path.join(
   __dirname,
@@ -223,12 +226,17 @@ function syncSuperAdmin() {
     `).run(bcrypt.hashSync(password, 12), existingUser.id);
   }
 
-  db.prepare(`
-    DELETE FROM users
-    WHERE role = 'super_admin'
-      AND email = 'admin@practice-app.hr'
-      AND LOWER(email) <> ?
-  `).run(email);
+  const currentSuperAdmin = db
+    .prepare("SELECT id FROM users WHERE LOWER(email) = ? AND role = 'super_admin'")
+    .get(email);
+
+  if (currentSuperAdmin) {
+    db.prepare(`
+      DELETE FROM users
+      WHERE role = 'super_admin'
+        AND id <> ?
+    `).run(currentSuperAdmin.id);
+  }
 }
 
 try {
@@ -242,7 +250,13 @@ try {
     WHERE status IN ('planned', 'active');
     DROP TABLE IF EXISTS faculties;
   `);
-  db.exec(seedScript);
+
+  const hasAnyUsers = db.prepare("SELECT COUNT(*) AS count FROM users").get().count > 0;
+
+  if (!hasAnyUsers) {
+    db.exec(seedScript);
+  }
+
   syncSuperAdmin();
 
   console.log("SQLite baza uspješno inicijalizirana.");
